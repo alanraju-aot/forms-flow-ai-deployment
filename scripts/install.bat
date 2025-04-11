@@ -1,312 +1,464 @@
 @echo off
-
 setlocal EnableDelayedExpansion
 
-:start
+echo *******************************************
+echo *     formsflow.ai Installation Script    *
+echo *******************************************
+echo.
 
-:: Detect the appropriate Docker Compose command
+REM Detect the appropriate Docker Compose command
+set "COMPOSE_COMMAND="
 for /f "tokens=*" %%A in ('docker compose version 2^>nul') do (
     set "COMPOSE_COMMAND=docker compose"
 )
-if not defined COMPOSE_COMMAND (
+
+if "!COMPOSE_COMMAND!"=="" (
     for /f "tokens=*" %%A in ('docker-compose version 2^>nul') do (
         set "COMPOSE_COMMAND=docker-compose"
     )
 )
-if not defined COMPOSE_COMMAND (
-    echo Neither docker compose nor docker-compose is installed. Please install one.
+
+if "!COMPOSE_COMMAND!"=="" (
+    echo ERROR: Neither docker compose nor docker-compose is installed.
+    echo Please install Docker Desktop or Docker Engine with Compose.
+    pause
     exit /b 1
 )
 
-:: Notify the user which command is being used
-echo Using %COMPOSE_COMMAND%
+echo Using !COMPOSE_COMMAND!
 
-:: Run the docker -v command and capture its output
+REM Get Docker version
 for /f "tokens=*" %%A in ('docker -v 2^>^&1') do (
     set "docker_info=%%A"
 )
 
-:: Extract the Docker version using string manipulation
-for /f "tokens=3" %%B in ("!docker_info!") do (
-    set "docker_version=%%B"
+set "docker_version="
+for /f "tokens=3 delims= " %%A in ("!docker_info!") do (
+    set "docker_version=%%A"
     set "docker_version=!docker_version:,=!"
 )
-:: Display the extracted Docker version
-echo Docker version: %docker_version%
 
-:: Set the URL where tested versions are uploaded
+echo Docker version: !docker_version!
+
+REM Check if version is tested
 set "url=https://tested-versions-docker-formsflow.aot-technologies.com/docker_versions.html"
-
-:: Fetch the tested versions using curl
 set "versionsFile=tested_versions.tmp"
-curl -s "%url%" > "%versionsFile%" || (
-    echo Failed to fetch tested versions. Please check your internet connection or the URL.
-    exit /b 1
+
+echo Checking compatibility with your Docker version...
+curl -s "!url!" > "!versionsFile!" 2>nul || (
+    echo WARNING: Failed to fetch tested versions.
+    echo The script will continue, but compatibility is not guaranteed.
+    set "versionChecked=false"
+    goto SkipVersionCheck
 )
 
-:: Check if the user's version is in the fetched list
 set "versionFound="
-for /f %%B in ('type "%versionsFile%"') do (
-    if "!docker_version!" equ "%%B" (
+for /f %%A in ('type "!versionsFile!"') do (
+    if "!docker_version!"=="%%A" (
         set "versionFound=true"
-        goto :VersionFound
+        goto VersionFound
     )
 )
 
-:: If the user's version is not found, display a warning
-echo This Docker version is not tested! 
-set /p continue=Do you want to continue? [y/n]
-if /i "%continue%" equ "y" (
-   goto :start 
-) else (
+echo WARNING: This Docker version is not in the tested compatibility list.
+set /p "continue=Do you want to continue anyway? [y/n] "
+if /i "!continue!" neq "y" (
+   echo Installation cancelled.
+   del "!versionsFile!" 2>nul
+   pause
    exit /b 1
 )
+goto SkipVersionCheck
 
 :VersionFound
-:: Display a success message if the version is found
-echo Your Docker version (%docker_version%) is tested and working!
-
-call:find-my-ip
-:: Clean up temporary file
-del "%versionsFile%"
-
-set /p choice=Do you want analytics to include in the installation? [y/n]
-if %choice%==y (
-    set /a analytics=1
-) else (
-    set /a analytics=0
+if defined versionFound (
+    echo SUCCESS: Your Docker version (!docker_version!) is tested and compatible!
 )
 
-echo For opensource - One distinctive capability of the formsflow.ai involves Sentiment Analysis, allowing it to assess sentiments within forms by considering specific topics specified by the designer during form creation. The data analysis api encompasses access to all pertinent interfaces tailored for sentiment analysis
-set /p includeDataAnalysis=Do you want to include forms-flow-data-analysis-api in the installation? [y/n]
-if %includeDataAnalysis%==y (
-    set /a dataanalysis =1
-) else (
-    set /a dataanalysis=0
+:SkipVersionCheck
+REM Find IP address - try multiple methods
+echo Finding your IP address...
+
+REM Method 1: Use ipconfig to find IP
+set "ip_add="
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /r "IPv4.*[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*"') do (
+    set "temp_ip=%%a"
+    set "temp_ip=!temp_ip:~1!"
+    if not "!temp_ip:127.0.0.=!"=="!temp_ip!" (
+        REM Skip localhost addresses
+    ) else if "!ip_add!"=="" (
+        set "ip_add=!temp_ip!"
+    )
 )
 
-call:main %analytics% %keycloak%
+REM Method 2: Use route as fallback
+if "!ip_add!"=="" (
+    for /f "tokens=4 delims= " %%i in ('route print ^| find " 0.0.0.0"') do set "ip_add=%%i"
+)
 
-echo ********************** formsflow.ai is successfully installed ****************************
-pause
-
-EXIT /B %ERRORLEVEL%
-
-
-:: ================&&&&&&===  Functions  ====&&&&&&&&&============================
-
-:: #############################################################
-:: ################### Main Function ###########################
-:: #############################################################
-
-:main
-    call:set-common-properties
-    call:keycloak ..\docker-compose %~2 
-    if %~1==1 (
-        call:forms-flow-analytics ..\docker-compose
+if "!ip_add!"=="" (
+    echo WARNING: Could not automatically detect your IP address.
+    set /p "ip_add=Please enter your IP address manually: "
+) else (
+    echo Detected IP address: !ip_add!
+    set /p "choice=Is this your correct IPv4 address? [y/n] "
+    if /i "!choice!" neq "y" (
+        set /p "ip_add=Please enter your correct IP address: "
     )
-    call:forms-flow-forms ..\docker-compose
-    call:forms-flow-bpm ..\docker-compose
-    call:forms-flow-api ..\docker-compose %~1
-    call:forms-flow-web ..\docker-compose
-    call:forms-flow-documents ..\docker-compose
-    if %~1==1 (
-          call:forms-flow-data-analysis-api ..\docker-compose
+)
+
+echo IP address set to: !ip_add!
+
+REM Clean up temporary file
+del "!versionsFile!" 2>nul
+
+REM Find docker-compose files
+echo Locating docker-compose files...
+
+set "DOCKER_COMPOSE_DIR="
+set "COMPOSE_FILE="
+set "ANALYTICS_COMPOSE_FILE="
+
+REM Check current directory
+if exist "docker-compose.yml" (
+    set "COMPOSE_FILE=docker-compose.yml"
+    set "DOCKER_COMPOSE_DIR=."
+    echo Found docker-compose.yml in current directory.
+)
+
+REM Check parent directory
+if not defined COMPOSE_FILE (
+    if exist "..\docker-compose.yml" (
+        set "COMPOSE_FILE=..\docker-compose.yml"
+        set "DOCKER_COMPOSE_DIR=.."
+        echo Found docker-compose.yml in parent directory.
     )
-    call:isUp
-    EXIT /B 0
-	
+)
 
-:: ############################################################
-:: ##################### Check working ########################
-:: ############################################################    
+REM Check docker-compose subdirectory
+if not defined COMPOSE_FILE (
+    if exist "docker-compose\docker-compose.yml" (
+        set "COMPOSE_FILE=docker-compose\docker-compose.yml"
+        set "DOCKER_COMPOSE_DIR=docker-compose"
+        echo Found docker-compose.yml in docker-compose subdirectory.
+    )
+)
 
-:isUp
-   :Check if the web API is up
-     for /f %%a in ('curl -LI "http://%ip-add%:5001" -o nul -w "%%{http_code}" -s') do set "HTTP=%%a"
-     if "%HTTP%" == "200" (
-       echo formsflow.ai is successfully installed.
-       EXIT /B 0
-     ) else (
-       echo Finishing setup.
-       ping 127.0.0.1 -n 6 >nul
-       goto isUp
-     )
+REM Check parent's docker-compose subdirectory
+if not defined COMPOSE_FILE (
+    if exist "..\docker-compose\docker-compose.yml" (
+        set "COMPOSE_FILE=..\docker-compose\docker-compose.yml"
+        set "DOCKER_COMPOSE_DIR=..\docker-compose"
+        echo Found docker-compose.yml in parent's docker-compose subdirectory.
+    )
+)
 
-:: #############################################################
-:: ################### Finding IP Address ######################
-:: #############################################################
+REM Check for analytics compose file
+if defined DOCKER_COMPOSE_DIR (
+    if exist "!DOCKER_COMPOSE_DIR!\analytics-docker-compose.yml" (
+        set "ANALYTICS_COMPOSE_FILE=!DOCKER_COMPOSE_DIR!\analytics-docker-compose.yml"
+        echo Found analytics-docker-compose.yml.
+    )
+)
 
-:find-my-ip
-    FOR /F "tokens=4 delims= " %%i in ('route print ^| find " 0.0.0.0"') do set ip-add=%%i
-    set /p choice=Confirm that your IPv4 address is %ip-add%? [y/n]
-    if %choice%==y (
-           EXIT /B 0
-     ) else (
-       set /p ip-add="What is your IPv4 address?"
-     )
-    EXIT /B 0
-  
-:set-common-properties
-    set WEBSOCKET_ENCRYPT_KEY=giert989jkwrgb@DR55
-    set KEYCLOAK_BPM_CLIENT_SECRET=e4bdbd25-1467-4f7f-b993-bc4b1944c943
-    EXIT /B 0
+if not defined COMPOSE_FILE (
+    echo ERROR: Could not find docker-compose.yml file.
+    echo Please make sure the file exists in one of these locations:
+    echo - Current directory
+    echo - Parent directory
+    echo - docker-compose subdirectory
+    echo - Parent's docker-compose subdirectory
+    
+    set /p "customPath=Enter the path to docker-compose.yml or press Enter to exit: "
+    if "!customPath!"=="" (
+        echo Installation cancelled.
+        pause
+        exit /b 1
+    )
+    
+    if exist "!customPath!" (
+        set "COMPOSE_FILE=!customPath!"
+        for %%F in ("!COMPOSE_FILE!") do set "DOCKER_COMPOSE_DIR=%%~dpF"
+        set "DOCKER_COMPOSE_DIR=!DOCKER_COMPOSE_DIR:~0,-1!"
+        echo Using provided docker-compose.yml at !COMPOSE_FILE!
+    ) else (
+        echo The specified file does not exist.
+        echo Installation cancelled.
+        pause
+        exit /b 1
+    )
+)
 
-:: #############################################################
-:: ########################### Keycloak ########################
-:: #############################################################
+REM Create installation directory if it doesn't exist
+if not exist "!DOCKER_COMPOSE_DIR!" (
+    echo Creating docker-compose directory...
+    mkdir "!DOCKER_COMPOSE_DIR!" 2>nul
+)
 
-:keycloak
+REM Check for existing installation
+if exist "!DOCKER_COMPOSE_DIR!\.env" (
+    echo WARNING: Existing installation detected.
+    set /p "overwrite=Do you want to overwrite the existing installation? [y/n] "
+    if /i "!overwrite!" neq "y" (
+        echo Installation cancelled.
+        pause
+        exit /b 0
+    )
+    echo Clearing existing environment file...
+    del "!DOCKER_COMPOSE_DIR!\.env" 2>nul
+)
 
-        if exist %~1\.env (
-        del %~1\.env
+REM Analytics selection
+set /p "choice=Do you want to include analytics in the installation? [y/n] "
+if /i "!choice!"=="y" (
+    set "analytics=1"
+    echo Analytics will be included in the installation.
+    
+    if not defined ANALYTICS_COMPOSE_FILE (
+        echo WARNING: analytics-docker-compose.yml not found in the same directory as docker-compose.yml.
+        set /p "continueWithoutAnalytics=Continue without analytics? [y/n] "
+        if /i "!continueWithoutAnalytics!" neq "y" (
+            echo Installation cancelled.
+            pause
+            exit /b 0
         )
-	    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d keycloak
-		timeout 5
-		set KEYCLOAK_URL=http://%ip-add%:8080
- 	EXIT /B 0
-   
-:: #############################################################
-:: ################### forms-flow-forms ########################
-:: #############################################################
-
-:forms-flow-forms
-
-    set FORMIO_DEFAULT_PROJECT_URL=http://%ip-add%:3001
-    echo FORMIO_DEFAULT_PROJECT_URL=%FORMIO_DEFAULT_PROJECT_URL%>>%~1\.env
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-forms
-    timeout 5
-    EXIT /B 0
-	
-:: #########################################################################
-:: ######################### forms-flow-web ################################
-:: #########################################################################
-
-:forms-flow-web
-
-    SETLOCAL
-    set BPM_API_URL=http://%ip-add%:8000/camunda
-    echo BPM_API_URL=%BPM_API_URL%>>%~1\.env
-
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-web
-    EXIT /B 0
-
-:: #############################################################
-:: ################### forms-flow-bpm ########################
-:: #############################################################
-
-:forms-flow-bpm
-
-    SETLOCAL
-    set FORMSFLOW_API_URL=http://%ip-add%:5001
-    set WEBSOCKET_SECURITY_ORIGIN=http://%ip-add%:3000
-    set SESSION_COOKIE_SECURE=false
-    set KEYCLOAK_WEB_CLIENTID=forms-flow-web
-    set REDIS_URL=redis://%ip-add%:6379/0
-    set KEYCLOAK_URL_HTTP_RELATIVE_PATH=/auth
-    set FORMSFLOW_DOC_API_URL=http://%ip-add%:5006
-    set DATA_ANALYSIS_URL=http://%ip-add%:6001
-
-    echo KEYCLOAK_URL=%KEYCLOAK_URL%>>%~1\.env
-    echo KEYCLOAK_BPM_CLIENT_SECRET=%KEYCLOAK_BPM_CLIENT_SECRET%>>%~1\.env
-    echo FORMSFLOW_API_URL=%FORMSFLOW_API_URL%>>%~1\.env
-    echo WEBSOCKET_SECURITY_ORIGIN=%WEBSOCKET_SECURITY_ORIGIN%>>%~1\.env
-    echo SESSION_COOKIE_SECURE=%SESSION_COOKIE_SECURE%>>%~1\.env
-    echo KEYCLOAK_WEB_CLIENTID=%KEYCLOAK_WEB_CLIENTID%>>%~1\.env
-    echo REDIS_URL=%REDIS_URL%>>%~1\.env
-    echo FORMSFLOW_DOC_API_URL=%FORMSFLOW_DOC_API_URL%>>%~1\.env
-    echo KEYCLOAK_URL_HTTP_RELATIVE_PATH=%KEYCLOAK_URL_HTTP_RELATIVE_PATH%>>%~1\.env
-    echo DATA_ANALYSIS_URL=%DATA_ANALYSIS_URL%>>%~1\.env
-    
-    ENDLOCAL
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-bpm
-    timeout 6
-    EXIT /B 0  
-
-:: #############################################################
-:: ################### forms-flow-analytics ########################
-:: #############################################################
-
-:forms-flow-analytics
-
-    SETLOCAL
-    set REDASH_HOST=http://%ip-add%:7001
-    set PYTHONUNBUFFERED=0
-    set REDASH_LOG_LEVEL=INFO
-    set REDASH_REDIS_URL=redis://redis:6379/0
-    set POSTGRES_USER=postgres
-    set POSTGRES_PASSWORD=changeme
-    set POSTGRES_DB=postgres
-    set REDASH_COOKIE_SECRET=redash-selfhosted
-    set REDASH_SECRET_KEY=redash-selfhosted
-    set REDASH_DATABASE_URL=postgresql://postgres:changeme@postgres/postgres
-    set REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=*
-    set REDASH_REFERRER_POLICY=no-referrer-when-downgrade
-    set REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=Content-Type, Authorization
-    echo REDASH_HOST=%REDASH_HOST%>>%~1\.env
-    echo PYTHONUNBUFFERED=%PYTHONUNBUFFERED%>>%~1\.env
-    echo REDASH_LOG_LEVEL=%REDASH_LOG_LEVEL%>>%~1\.env
-    echo REDASH_REDIS_URL=%REDASH_REDIS_URL%>>%~1\.env
-    echo POSTGRES_USER=%POSTGRES_USER%>>%~1\.env
-    echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%>>%~1\.env
-    echo POSTGRES_DB=%POSTGRES_DB%>>%~1\.env
-    echo REDASH_COOKIE_SECRET=%REDASH_COOKIE_SECRET%>>%~1\.env
-    echo REDASH_SECRET_KEY=%REDASH_SECRET_KEY%>>%~1\.env
-    echo REDASH_DATABASE_URL=%REDASH_DATABASE_URL%>>%~1\.env
-    echo REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=%REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN%>>%~1\.env
-    echo REDASH_REFERRER_POLICY=%REDASH_REFERRER_POLICY%>>%~1\.env
-    echo REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=%REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS%>>%~1\.env
-    ENDLOCAL
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\analytics-docker-compose.yml run --rm server create_db
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\analytics-docker-compose.yml up --build -d
-	timeout 5
-    EXIT /B 0
-
-:: #############################################################
-:: ################### forms-flow-api ########################
-:: #############################################################
-
-:forms-flow-api
-
-    SETLOCAL
-
-    set WEB_BASE_URL=http://%ip-add%:3000
-    set FORMSFLOW_ADMIN_URL=http://%ip-add%:5010/api/v1
-    if %~2==1 (
-        set /p INSIGHT_API_KEY="What is your Redash API key?"
-        set INSIGHT_API_URL=http://%ip-add%:7001
+        set "analytics=0"
+        echo Analytics will NOT be included.
     )
-    if %~2==1 (
-        echo INSIGHT_API_URL=%INSIGHT_API_URL%>>%~1\.env
-        echo INSIGHT_API_KEY=%INSIGHT_API_KEY%>>%~1\.env
-    )
-    echo WEB_BASE_URL=%WEB_BASE_URL%>>%~1\.env
-    echo FORMSFLOW_ADMIN_URL=%FORMSFLOW_ADMIN_URL%>>%~1\.env
+) else (
+    set "analytics=0"
+    echo Analytics will not be included.
+)
+
+REM Data Analysis selection
+echo.
+echo Sentiment Analysis enables assessment of sentiments within forms by
+echo considering specific topics specified during form creation.
+echo The data analysis API provides interfaces for sentiment analysis.
+echo.
+set /p "includeDataAnalysis=Do you want to include forms-flow-data-analysis-api? [y/n] "
+if /i "!includeDataAnalysis!"=="y" (
+    set "dataanalysis=1"
+    echo Data Analysis API will be included.
+) else (
+    set "dataanalysis=0"
+    echo Data Analysis API will not be included.
+)
+
+echo.
+echo Installation summary:
+echo - IP Address: !ip_add!
+echo - Analytics: !analytics! [1=Yes, 0=No]
+echo - Data Analysis API: !dataanalysis! [1=Yes, 0=No]
+echo - Docker Compose File: !COMPOSE_FILE!
+if !analytics!==1 (
+    echo - Analytics Compose File: !ANALYTICS_COMPOSE_FILE!
+)
+echo.
+set /p "confirmInstall=Begin installation with these settings? [y/n] "
+if /i "!confirmInstall!" neq "y" (
+    echo Installation cancelled by user.
+    pause
+    exit /b 0
+)
+
+REM Create new .env file
+echo Creating environment configuration...
+echo # formsflow.ai Environment Configuration > "!DOCKER_COMPOSE_DIR!\.env"
+echo # Generated on %date% at %time% >> "!DOCKER_COMPOSE_DIR!\.env"
+echo. >> "!DOCKER_COMPOSE_DIR!\.env"
+
+REM Set common properties
+echo Setting common properties...
+set "WEBSOCKET_ENCRYPT_KEY=giert989jkwrgb@DR55"
+set "KEYCLOAK_BPM_CLIENT_SECRET=e4bdbd25-1467-4f7f-b993-bc4b1944c943"
+
+REM Setup Keycloak
+echo Setting up Keycloak...
+echo Starting Keycloak container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d keycloak
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start Keycloak
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for Keycloak to initialize...
+echo KEYCLOAK_URL=http://!ip_add!:8080 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo KEYCLOAK_BPM_CLIENT_SECRET=!KEYCLOAK_BPM_CLIENT_SECRET! >> "!DOCKER_COMPOSE_DIR!\.env"
+echo KEYCLOAK_URL_HTTP_RELATIVE_PATH=/auth >> "!DOCKER_COMPOSE_DIR!\.env"
+echo KEYCLOAK_WEB_CLIENTID=forms-flow-web >> "!DOCKER_COMPOSE_DIR!\.env"
+echo WEBSOCKET_ENCRYPT_KEY=!WEBSOCKET_ENCRYPT_KEY! >> "!DOCKER_COMPOSE_DIR!\.env"
+
+timeout /t 10 /nobreak >nul
+
+REM Setup forms-flow-forms
+echo Setting up forms-flow-forms...
+echo FORMIO_DEFAULT_PROJECT_URL=http://!ip_add!:3001 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo Starting forms-flow-forms container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-forms
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-forms
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for forms-flow-forms to initialize...
+timeout /t 10 /nobreak >nul
+
+REM Setup Analytics if selected
+if !analytics!==1 (
+    echo Setting up forms-flow-analytics...
+    echo REDASH_HOST=http://!ip_add!:7001 >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo PYTHONUNBUFFERED=0 >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_LOG_LEVEL=INFO >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_REDIS_URL=redis://redis:6379/0 >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo POSTGRES_USER=postgres >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo POSTGRES_PASSWORD=changeme >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo POSTGRES_DB=postgres >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_COOKIE_SECRET=redash-selfhosted >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_SECRET_KEY=redash-selfhosted >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_DATABASE_URL=postgresql://postgres:changeme@postgres/postgres >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=* >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_REFERRER_POLICY=no-referrer-when-downgrade >> "!DOCKER_COMPOSE_DIR!\.env"
+    echo REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=Content-Type, Authorization >> "!DOCKER_COMPOSE_DIR!\.env"
     
-    ENDLOCAL
-    %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-webapi
+    echo Creating analytics database...
+    !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" run --rm server create_db
+    if !ERRORLEVEL! neq 0 (
+        echo ERROR: Failed to create analytics database
+        pause
+        exit /b !ERRORLEVEL!
+    )
+    echo Starting analytics containers...
+    !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" up --build -d
+    if !ERRORLEVEL! neq 0 (
+        echo ERROR: Failed to start analytics containers
+        pause
+        exit /b !ERRORLEVEL!
+    )
+    echo Waiting for analytics to initialize...
+    timeout /t 10 /nobreak >nul
+    
+    echo INSIGHT_API_URL=http://!ip_add!:7001 >> "!DOCKER_COMPOSE_DIR!\.env"
+    set /p "INSIGHT_API_KEY=Enter your Redash API key: "
+    echo INSIGHT_API_KEY=!INSIGHT_API_KEY! >> "!DOCKER_COMPOSE_DIR!\.env"
+)
 
-:: #############################################################
-:: ############### forms-flow-documents-api ####################
-:: #############################################################
+REM Setup BPM
+echo Setting up forms-flow-bpm...
+echo FORMSFLOW_API_URL=http://!ip_add!:5001 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo WEBSOCKET_SECURITY_ORIGIN=http://!ip_add!:3000 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo SESSION_COOKIE_SECURE=false >> "!DOCKER_COMPOSE_DIR!\.env"
+echo REDIS_URL=redis://!ip_add!:6379/0 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_DOC_API_URL=http://!ip_add!:5006 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo DATA_ANALYSIS_URL=http://!ip_add!:6001 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo BPM_API_URL=http://!ip_add!:8000/camunda >> "!DOCKER_COMPOSE_DIR!\.env"
 
-:forms-flow-documents
+echo Starting forms-flow-bpm container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-bpm
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-bpm
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for forms-flow-bpm to initialize...
+timeout /t 15 /nobreak >nul
 
-  SETLOCAL
-  set DOCUMENT_SERVICE_URL=http://%ip-add%:5006
-  echo DOCUMENT_SERVICE_URL=%DOCUMENT_SERVICE_URL%>>%~1\.env
+REM Setup API
+echo Setting up forms-flow-api...
+echo WEB_BASE_URL=http://!ip_add!:3000 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_ADMIN_URL=http://!ip_add!:5010/api/v1 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo DOCUMENT_SERVICE_URL=http://!ip_add!:5006 >> "!DOCKER_COMPOSE_DIR!\.env"
 
-  %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-documents-api
-    timeout 5
-    EXIT /B 0
+echo Starting forms-flow-webapi container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-webapi
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-webapi
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for API to initialize...
+timeout /t 10 /nobreak >nul
 
-:forms-flow-data-analysis-api
+REM Setup Web
+echo Setting up forms-flow-web...
+echo Starting forms-flow-web container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-web
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-web
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for web interface to initialize...
+timeout /t 10 /nobreak >nul
 
-  SETLOCAL
-  set DATA_ANALYSIS_DB_URL=postgresql://general:changeme@forms-flow-data-analysis-db:5432/dataanalysis
+REM Setup Documents
+echo Setting up forms-flow-documents-api...
+echo Starting forms-flow-documents-api container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-documents-api
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-documents-api
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for documents API to initialize...
+timeout /t 10 /nobreak >nul
 
-  echo DATA_ANALYSIS_DB_URL=%DATA_ANALYSIS_DB_URL%>>%~1\.env
+REM Setup Data Analysis if selected
+if !dataanalysis!==1 (
+    echo Setting up forms-flow-data-analysis-api...
+    echo DATA_ANALYSIS_DB_URL=postgresql://general:changeme@forms-flow-data-analysis-db:5432/dataanalysis >> "!DOCKER_COMPOSE_DIR!\.env"
 
-  %COMPOSE_COMMAND% -p formsflow-ai -f %~1\docker-compose.yml up --build -d forms-flow-data-analysis-api
-    timeout 5
-    EXIT /B 0
+    echo Starting forms-flow-data-analysis-api container...
+    !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-data-analysis-api
+    if !ERRORLEVEL! neq 0 (
+        echo ERROR: Failed to start forms-flow-data-analysis-api
+        pause
+        exit /b !ERRORLEVEL!
+    )
+    echo Waiting for data analysis API to initialize...
+    timeout /t 10 /nobreak >nul
+)
+
+REM Verify installation
+echo Verifying installation...
+set /a "timeoutSeconds=300"
+set /a "elapsedSeconds=0"
+set "success=false"
+
+:CheckLoop
+echo Checking if services are ready... [!elapsedSeconds!/!timeoutSeconds! seconds]
+for /f %%a in ('curl -s -o nul -w "%%{http_code}" "http://!ip_add!:5001/" 2^>nul') do set "HTTP=%%a"
+if "!HTTP!" == "200" (
+  set "success=true"
+  goto :InstallVerified
+) else (
+  if !elapsedSeconds! GEQ !timeoutSeconds! (
+      goto :InstallVerified
+  )
+  timeout /t 10 /nobreak >nul
+  set /a "elapsedSeconds+=10"
+  goto :CheckLoop
+)
+
+:InstallVerified
+echo.
+if "!success!"=="true" (
+    echo ************************************************************
+    echo *        formsflow.ai has been successfully installed!     *
+    echo ************************************************************
+    echo.
+    echo Access your formsflow.ai application at: http://!ip_add!:3000
+    echo.
+) else (
+    echo WARNING: Installation verification timed out.
+    echo The installation may have completed but services are not responding as expected.
+    echo.
+    echo Try accessing your formsflow.ai application at: http://!ip_add!:3000
+    echo If issues persist, check container logs using:
+    echo !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" logs
+    echo.
+)
+
+pause
+endlocal
+exit /b 0
