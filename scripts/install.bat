@@ -76,7 +76,7 @@ if defined versionFound (
 )
 
 :SkipVersionCheck
-REM Find IP address - try multiple methods
+REM Find IP address
 echo Finding your IP address...
 
 REM Method 1: Use ipconfig to find IP
