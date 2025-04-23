@@ -40,39 +40,70 @@ for /f "tokens=3 delims= " %%A in ("!docker_info!") do (
 
 echo Docker version: !docker_version!
 
-REM Check if version is tested
+:: Set the URL where tested versions are uploaded
 set "url=https://tested-versions-docker-formsflow.aot-technologies.com/docker_versions.html"
+
+REM Temporary file for downloaded content
 set "versionsFile=tested_versions.tmp"
 
-echo Checking compatibility with your Docker version...
-curl -s "!url!" > "!versionsFile!" 2>nul || (
-    echo WARNING: Failed to fetch tested versions.
-    echo The script will continue, but compatibility is not guaranteed.
-    set "versionChecked=false"
-    goto SkipVersionCheck
+REM Try to fetch the tested versions using curl with verbose output for debugging
+echo Fetching tested Docker versions from !url!...
+curl -s -v "%url%" > "%versionsFile%" 2>curl_debug.log
+
+REM Check if the download was successful
+if not exist "%versionsFile%" (
+    echo Failed to fetch tested versions. Using local version check instead.
+    goto :SkipVersionCheck
 )
 
+REM Check file size - if zero or very small, download likely failed
+for %%A in ("%versionsFile%") do set "fileSize=%%~zA"
+if !fileSize! LSS 10 (
+    echo Downloaded file is too small or empty. Using local version check instead.
+    goto :SkipVersionCheck
+)
+
+REM Parse the HTML file to extract version numbers
+echo Checking if your Docker version is tested...
 set "versionFound="
-for /f %%A in ('type "!versionsFile!"') do (
-    if "!docker_version!"=="%%A" (
-        set "versionFound=true"
-        goto VersionFound
+
+REM Just search for your version in the file - handle simple HTML or plain text list
+findstr /C:"%docker_version%" "%versionsFile%" >nul 2>&1
+if !ERRORLEVEL! EQU 0 (
+    set "versionFound=true"
+    echo Your Docker version %docker_version% is in the tested versions list.
+    goto :SkipVersionCheck
+)
+
+REM Try to extract versions from HTML content if simple match failed
+for /f "tokens=*" %%B in ('type "%versionsFile%" ^| findstr /R "[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*"') do (
+    for /f "tokens=1 delims=<>" %%C in ("%%B") do (
+        if "!docker_version!" equ "%%C" (
+            set "versionFound=true"
+            echo Your Docker version %docker_version% is in the tested versions list.
+            goto :SkipVersionCheck
+        )
     )
 )
 
-echo WARNING: This Docker version is not in the tested compatibility list.
-set /p "continue=Do you want to continue anyway? [y/n] "
-if /i "!continue!" neq "y" (
-   echo Installation cancelled.
-   del "!versionsFile!" 2>nul
-   pause
-   exit /b 1
-)
-goto SkipVersionCheck
+REM If we get here, version was not found in the downloaded list
+echo Your Docker version %docker_version% was not found in the tested versions list.
+goto :AskToContinue
 
-:VersionFound
-if defined versionFound (
-    echo SUCCESS: Your Docker version (!docker_version!) is tested and compatible!
+:AskToContinue
+REM If the version was not found, ask the user if they want to continue
+if not defined versionFound (
+    echo WARNING: This Docker version is not in our tested versions list! 
+    set /p continue=Do you want to continue anyway? [y/n] 
+    if /i "!continue!" equ "y" (
+       echo Continuing with installation...
+       goto :SkipVersionCheck
+    ) else (
+       echo Installation cancelled by user.
+       del "%versionsFile%" 2>nul
+       del "curl_debug.log" 2>nul
+       exit /b 1
+    )
 )
 
 :SkipVersionCheck
@@ -109,8 +140,10 @@ if "!ip_add!"=="" (
 
 echo IP address set to: !ip_add!
 
-REM Clean up temporary file
-del "!versionsFile!" 2>nul
+REM Clean up temporary file if it exists
+if exist "tested_versions.txt" del "tested_versions.txt" 
+if exist "tested_versions.tmp" del "tested_versions.tmp" 
+if exist "curl_debug.log" del "curl_debug.log" 
 
 REM Find docker-compose files
 echo Locating docker-compose files...
@@ -427,7 +460,10 @@ set "success=false"
 
 :CheckLoop
 echo Checking if services are ready... [!elapsedSeconds!/!timeoutSeconds! seconds]
-for /f %%a in ('curl -s -o nul -w "%%{http_code}" "http://!ip_add!:5001/" 2^>nul') do set "HTTP=%%a"
+curl -s -o nul -w "%%{http_code}" "http://!ip_add!:5001/" > temp_status.txt 2>nul
+set /p HTTP=<temp_status.txt
+del temp_status.txt
+
 if "!HTTP!" == "200" (
   set "success=true"
   goto :InstallVerified
