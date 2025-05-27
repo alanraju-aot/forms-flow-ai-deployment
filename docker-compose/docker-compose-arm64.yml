@@ -15,7 +15,7 @@ services:
       - formsflow
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.4
+    image: quay.io/keycloak/keycloak:26.1.2
     restart: always
     container_name: keycloak
     volumes:
@@ -32,6 +32,7 @@ services:
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-changeme}
       - KEYCLOAK_START_MODE=${KEYCLOAK_START_MODE:-start-dev}
       - KEYCLOAK_HTTP_PATH=${KEYCLOAK_HTTP_PATH:-/auth}
+
     ports:
       - "8080:8080"
     depends_on:
@@ -45,7 +46,7 @@ services:
     image: formsflow/keycloak-customizations:v7.1.0-alpha
     restart: always
     tty: true
-    stdin_open: true    
+    stdin_open: true  
     volumes:
       - keycloak_custom_data:/custom
     networks:
@@ -82,6 +83,7 @@ services:
       # - MF_FORMSFLOW_THEME_URL=${MF_FORMSFLOW_THEME_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-theme@v7.1.0-alpha/forms-flow-theme.gz.js}
       - NODE_ENV=${NODE_ENV:-production}
       - REACT_APP_API_SERVER_URL=${FORMIO_DEFAULT_PROJECT_URL}
+      - REACT_APP_LANGUAGE=${LANGUAGE:-en}
       - REACT_APP_API_PROJECT_URL=${FORMIO_DEFAULT_PROJECT_URL}
       - REACT_APP_KEYCLOAK_CLIENT=${KEYCLOAK_WEB_CLIENT_ID:-forms-flow-web}
       - REACT_APP_WEB_BASE_URL=${FORMSFLOW_API_URL}
@@ -103,12 +105,17 @@ services:
       - REACT_APP_PUBLIC_WORKFLOW_ENABLED=${PUBLIC_WORKFLOW_ENABLED:-false}
       - REACT_APP_DOCUMENT_SERVICE_URL=${DOCUMENT_SERVICE_URL}
       - REACT_APP_CUSTOM_THEME_URL=${CUSTOM_THEME_URL}
+      - REACT_APP_CUSTOM_RESOURCE_BUNDLE_URL=${CUSTOM_RESOURCE_BUNDLE_URL}
       - REACT_APP_KEYCLOAK_ENABLE_CLIENT_AUTH=${KEYCLOAK_ENABLE_CLIENT_AUTH:-false}
       - REACT_APP_ENABLE_FORMS_MODULE=${ENABLE_FORMS_MODULE:-true}
       - REACT_APP_ENABLE_TASKS_MODULE=${ENABLE_TASKS_MODULE:-true}
       - REACT_APP_ENABLE_DASHBOARDS_MODULE=${ENABLE_DASHBOARDS_MODULE:-true}
       - REACT_APP_ENABLE_PROCESSES_MODULE=${ENABLE_PROCESSES_MODULE:-true}
       - REACT_APP_ENABLE_APPLICATIONS_MODULE=${ENABLE_APPLICATIONS_MODULE:-true}
+      - REACT_APP_DATE_FORMAT=${DATE_FORMAT:-DD-MM-YY}
+      - REACT_APP_TIME_FORMAT=${TIME_FORMAT:-hh:mm:ss A}
+      - REACT_APP_KEYCLOAK_URL_HTTP_RELATIVE_PATH=${KEYCLOAK_URL_HTTP_RELATIVE_PATH}
+      - REACT_APP_USER_NAME_DISPLAY_CLAIM=${USER_NAME_DISPLAY_CLAIM:-}
       
     ports:
       - "3000:8080"
@@ -174,13 +181,27 @@ services:
       - CUSTOM_SUBMISSION_URL=${CUSTOM_SUBMISSION_URL}
       - CUSTOM_SUBMISSION_ENABLED=${CUSTOM_SUBMISSION_ENABLED:-false}
       - MULTI_TENANCY_ENABLED=${MULTI_TENANCY_ENABLED:-false}
-      - KEYCLOAK_WEB_CLIENTID=${KEYCLOAK_WEB_CLIENTID:-forms-flow-web}
+      - KEYCLOAK_ENABLE_CLIENT_AUTH=${KEYCLOAK_ENABLE_CLIENT_AUTH:-false}
+      - KEYCLOAK_WEB_CLIENTID=${KEYCLOAK_WEB_CLIENT_ID:-forms-flow-web}
       - FORMSFLOW_ADMIN_URL=${FORMSFLOW_ADMIN_URL:-}
       - REDIS_ENABLED=${REDIS_ENABLED:-false}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSCODE=${REDIS_PASSCODE:-changeme}
-      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}
+      - VAULT_ENABLED=${VAULT_ENABLED:-false}
+      - VAULT_URL=${VAULT_URL}
+      - VAULT_TOKEN=${VAULT_TOKEN}
+      - VAULT_PATH=${VAULT_PATH}
+      - VAULT_SECRET=${VAULT_SECRET}
+      - SHARED_REALM=${SHARED_REALM:-false}
+      - CSS_API_BASE_URL=${CSS_API_BASE_URL:-}
+      - CSS_API_CLIENT_ID=${CSS_API_CLIENT_ID:-}
+      - CSS_API_SECRET=${CSS_API_SECRET:-}
+      - CSS_API_LOGIN_URL=${CSS_API_LOGIN_URL:-}
+      - CSS_ENV=${CSS_ENV:-}
+      - CSS_INTEGRATION_ID=${CSS_INTEGRATION_ID:-}
+      - USER_NAME_DISPLAY_CLAIM=${USER_NAME_DISPLAY_CLAIM:-}
     ports:
       - "8000:8080"
     links:
@@ -224,15 +245,20 @@ services:
       INSIGHT_API_KEY: ${INSIGHT_API_KEY}
       INSIGHT_API_URL: ${INSIGHT_API_URL}
       DATABASE_URL: ${FORMSFLOW_API_DB_URL:-postgresql://postgres:changeme@forms-flow-webapi-db:5432/webapi}
-      BPM_TOKEN_API: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/token
+      DATABASE_USERNAME: ${FORMSFLOW_API_DB_USER}
+      DATABASE_PASSWORD: ${FORMSFLOW_API_DB_PASSWORD}
+      DATABASE_HOST: ${FORMSFLOW_API_DB_HOST}
+      DATABASE_PORT: ${FORMSFLOW_API_DB_PORT}
+      DATABASE_NAME: ${FORMSFLOW_API_DB_NAME}
+      BPM_TOKEN_API: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/token
       BPM_CLIENT_ID: ${KEYCLOAK_BPM_CLIENT_ID:-forms-flow-bpm}
       BPM_CLIENT_SECRET: ${KEYCLOAK_BPM_CLIENT_SECRET:-e4bdbd25-1467-4f7f-b993-bc4b1944c943}
       BPM_API_URL: ${BPM_API_URL}
       FORMSFLOW_API_CORS_ORIGINS: ${FORMSFLOW_API_CORS_ORIGINS:-*}
-      JWT_OIDC_WELL_KNOWN_CONFIG: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/.well-known/openid-configuration
+      JWT_OIDC_WELL_KNOWN_CONFIG: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/.well-known/openid-configuration
       JWT_OIDC_ALGORITHMS: 'RS256'
-      JWT_OIDC_JWKS_URI: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/certs
-      JWT_OIDC_ISSUER: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}
+      JWT_OIDC_JWKS_URI: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/certs
+      JWT_OIDC_ISSUER: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}
       JWT_OIDC_AUDIENCE: ${KEYCLOAK_WEB_CLIENT_ID:-forms-flow-web}
       JWT_OIDC_CACHING_ENABLED: 'True'
       JWT_OIDC_JWKS_CACHE_TIMEOUT: 300
@@ -255,6 +281,14 @@ services:
       CONFIGURE_LOGS: ${CONFIGURE_LOGS:-true}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FORMSFLOW_ADMIN_URL: ${FORMSFLOW_ADMIN_URL}
+      SHARED_REALM: ${SHARED_REALM:-false}
+      CSS_API_BASE_URL: ${CSS_API_BASE_URL:-}
+      CSS_API_CLIENT_ID: ${CSS_API_CLIENT_ID:-}
+      CSS_API_SECRET: ${CSS_API_SECRET:-}
+      CSS_API_LOGIN_URL: ${CSS_API_LOGIN_URL:-}
+      CSS_ENV: ${CSS_ENV:-}
+      CSS_INTEGRATION_ID: ${CSS_INTEGRATION_ID:-}
+      USER_NAME_DISPLAY_CLAIM: ${USER_NAME_DISPLAY_CLAIM:-}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-5}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-10}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
@@ -270,9 +304,9 @@ services:
       - ./:/app:rw
     environment:
       FORMSFLOW_API_CORS_ORIGINS: ${FORMSFLOW_API_CORS_ORIGINS:-*}
-      JWT_OIDC_WELL_KNOWN_CONFIG: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/.well-known/openid-configuration
-      JWT_OIDC_JWKS_URI: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/certs
-      JWT_OIDC_ISSUER: ${KEYCLOAK_URL}/auth/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}
+      JWT_OIDC_WELL_KNOWN_CONFIG: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/.well-known/openid-configuration
+      JWT_OIDC_JWKS_URI: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/protocol/openid-connect/certs
+      JWT_OIDC_ISSUER: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}
       JWT_OIDC_AUDIENCE: ${KEYCLOAK_WEB_CLIENT_ID:-forms-flow-web}
       JWT_OIDC_CACHING_ENABLED: 'True'
       KEYCLOAK_URL: ${KEYCLOAK_URL}
@@ -293,12 +327,11 @@ services:
       API_LOG_ROTATION_INTERVAL: ${API_LOG_ROTATION_INTERVAL:-1}
       API_LOG_BACKUP_COUNT: ${API_LOG_BACKUP_COUNT:-7}
       CONFIGURE_LOGS: ${CONFIGURE_LOGS:-true}
-
     ports:
       - "5006:5006"
     networks:
       - formsflow
-  
+
   forms-flow-data-analysis-db:
     image: postgres:14
     environment:
