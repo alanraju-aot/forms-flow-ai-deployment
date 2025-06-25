@@ -41,7 +41,7 @@ for /f "tokens=3 delims= " %%A in ("!docker_info!") do (
 echo Docker version: !docker_version!
 
 :: Set the URL where tested versions are uploaded
-set "url=https://tested-versions-docker-formsflow.aot-technologies.com/docker_versions.html"
+set "url=https://forms-flow-docker-versions.s3.ca-central-1.amazonaws.com/docker_versions.html"
 
 REM Temporary file for downloaded content
 set "versionsFile=tested_versions.tmp"
@@ -281,8 +281,8 @@ if /i "!includeDataAnalysis!"=="y" (
 echo.
 echo Installation summary:
 echo - IP Address: !ip_add!
-echo - Analytics: !analytics! [1=Yes, 0=No]
-echo - Data Analysis API: !dataanalysis! [1=Yes, 0=No]
+echo - Analytics: !analytics!
+echo - Data Analysis API: !dataanalysis!
 echo - Docker Compose File: !COMPOSE_FILE!
 if !analytics!==1 (
     echo - Analytics Compose File: !ANALYTICS_COMPOSE_FILE!
@@ -423,6 +423,50 @@ if !ERRORLEVEL! neq 0 (
 )
 echo Waiting for web interface to initialize...
 timeout /t 10 /nobreak >nul
+
+REM Setup Data Layer
+echo Setting up forms-flow-data-layer...
+echo DEBUG=false >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_DATA_LAYER_WORKERS=4 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_DATALAYER_CORS_ORIGINS=* >> "!DOCKER_COMPOSE_DIR!\.env"
+echo KEYCLOAK_ENABLE_CLIENT_AUTH=false >> "!DOCKER_COMPOSE_DIR!\.env"
+echo KEYCLOAK_URL_REALM=forms-flow-ai >> "!DOCKER_COMPOSE_DIR!\.env"
+echo JWT_OIDC_JWKS_URI=http://!ip_add!:8080/auth/realms/forms-flow-ai/protocol/openid-connect/certs >> "!DOCKER_COMPOSE_DIR!\.env"
+echo JWT_OIDC_ISSUER=http://!ip_add!:8080/auth/realms/forms-flow-ai >> "!DOCKER_COMPOSE_DIR!\.env"
+echo JWT_OIDC_AUDIENCE=forms-flow-web >> "!DOCKER_COMPOSE_DIR!\.env"
+echo JWT_OIDC_CACHING_ENABLED=True >> "!DOCKER_COMPOSE_DIR!\.env"
+
+echo FORMSFLOW_API_DB_URL=postgresql://postgres:changeme@!ip_add!:6432/webapi >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_API_DB_HOST=!ip_add! >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_API_DB_PORT=6432 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_API_DB_USER=postgres >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_API_DB_PASSWORD=changeme >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMSFLOW_API_DB_NAME=webapi >> "!DOCKER_COMPOSE_DIR!\.env"
+
+echo FORMIO_DB_URI=mongodb://admin:changeme@!ip_add!:27018/formio?authMechanism=SCRAM-SHA-1^&authSource=admin >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_HOST=!ip_add! >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_PORT=27018 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_USERNAME=admin >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_PASSWORD=changeme >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_NAME=formio >> "!DOCKER_COMPOSE_DIR!\.env"
+echo FORMIO_DB_OPTIONS= >> "!DOCKER_COMPOSE_DIR!\.env"
+
+echo CAMUNDA_DB_URL=jdbc:postgresql://admin:changeme@!ip_add!:5432/formsflow-bpm >> "!DOCKER_COMPOSE_DIR!\.env"
+echo CAMUNDA_DB_USER=admin >> "!DOCKER_COMPOSE_DIR!\.env"
+echo CAMUNDA_DB_PASSWORD=changeme >> "!DOCKER_COMPOSE_DIR!\.env"
+echo CAMUNDA_DB_HOST=!ip_add! >> "!DOCKER_COMPOSE_DIR!\.env"
+echo CAMUNDA_DB_PORT=5432 >> "!DOCKER_COMPOSE_DIR!\.env"
+echo CAMUNDA_DB_NAME=formsflow-bpm >> "!DOCKER_COMPOSE_DIR!\.env"
+
+echo Starting forms-flow-data-layer container...
+!COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-data-layer
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: Failed to start forms-flow-data-layer
+    pause
+    exit /b !ERRORLEVEL!
+)
+echo Waiting for forms-flow-data-layer to initialize...
+timeout /t 5 /nobreak >nul
 
 REM Setup Documents
 echo Setting up forms-flow-documents-api...
