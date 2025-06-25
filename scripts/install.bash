@@ -223,6 +223,66 @@ forms_flow_documents() {
     $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-documents-api
     sleep 5
 }
+forms_flow_data_layer() {
+    DEBUG=false
+    FORMSFLOW_DATA_LAYER_WORKERS=4
+    FORMSFLOW_DATALAYER_CORS_ORIGINS=*
+    KEYCLOAK_ENABLE_CLIENT_AUTH=false
+    KEYCLOAK_URL_REALM=forms-flow-ai
+    JWT_OIDC_JWKS_URI=http://$ip_add:8080/auth/realms/forms-flow-ai/protocol/openid-connect/certs
+    JWT_OIDC_ISSUER=http://$ip_add:8080/auth/realms/forms-flow-ai
+    JWT_OIDC_AUDIENCE=forms-flow-web
+    JWT_OIDC_CACHING_ENABLED=True
+    FORMSFLOW_API_DB_URL=postgresql://postgres:changeme@$ip_add:6432/webapi
+    FORMSFLOW_API_DB_HOST=$ip_add
+    FORMSFLOW_API_DB_PORT=6432
+    FORMSFLOW_API_DB_USER=postgres
+    FORMSFLOW_API_DB_PASSWORD=changeme
+    FORMSFLOW_API_DB_NAME=webapi
+    FORMIO_DB_HOST=$ip_add
+    FORMIO_DB_PORT=27018
+    FORMIO_DB_USERNAME=admin
+    FORMIO_DB_PASSWORD=changeme
+    FORMIO_DB_NAME=formio
+    FORMIO_DB_URI="mongodb://admin:changeme@$ip_add:27018/formio?authMechanism=SCRAM-SHA-1&authSource=admin"
+    CAMUNDA_DB_URL=jdbc:postgresql://admin:changeme@$ip_add:5432/formsflow-bpm
+    CAMUNDA_DB_USER=admin
+    CAMUNDA_DB_PASSWORD=changeme
+    CAMUNDA_DB_HOST=$ip_add
+    CAMUNDA_DB_PORT=5432
+    CAMUNDA_DB_NAME=formsflow-bpm
+
+    echo "DEBUG=$DEBUG" >> "$1/.env"
+    echo "FORMSFLOW_DATA_LAYER_WORKERS=$FORMSFLOW_DATA_LAYER_WORKERS" >> "$1/.env"
+    echo "FORMSFLOW_DATALAYER_CORS_ORIGINS=$FORMSFLOW_DATALAYER_CORS_ORIGINS" >> "$1/.env"
+    echo "KEYCLOAK_ENABLE_CLIENT_AUTH=$KEYCLOAK_ENABLE_CLIENT_AUTH" >> "$1/.env"
+    echo "KEYCLOAK_URL_REALM=$KEYCLOAK_URL_REALM" >> "$1/.env"
+    echo "JWT_OIDC_JWKS_URI=$JWT_OIDC_JWKS_URI" >> "$1/.env"
+    echo "JWT_OIDC_ISSUER=$JWT_OIDC_ISSUER" >> "$1/.env"
+    echo "JWT_OIDC_AUDIENCE=$JWT_OIDC_AUDIENCE" >> "$1/.env"
+    echo "JWT_OIDC_CACHING_ENABLED=$JWT_OIDC_CACHING_ENABLED" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_URL=$FORMSFLOW_API_DB_URL" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_HOST=$FORMSFLOW_API_DB_HOST" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_PORT=$FORMSFLOW_API_DB_PORT" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_USER=$FORMSFLOW_API_DB_USER" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_PASSWORD=$FORMSFLOW_API_DB_PASSWORD" >> "$1/.env"
+    echo "FORMSFLOW_API_DB_NAME=$FORMSFLOW_API_DB_NAME" >> "$1/.env"
+    echo "FORMIO_DB_URI=$FORMIO_DB_URI" >> "$1/.env"
+    echo "FORMIO_DB_HOST=$FORMIO_DB_HOST" >> "$1/.env"
+    echo "FORMIO_DB_PORT=$FORMIO_DB_PORT" >> "$1/.env"
+    echo "FORMIO_DB_USERNAME=$FORMIO_DB_USERNAME" >> "$1/.env"
+    echo "FORMIO_DB_PASSWORD=$FORMIO_DB_PASSWORD" >> "$1/.env"
+    echo "FORMIO_DB_NAME=$FORMIO_DB_NAME" >> "$1/.env"
+    echo "FORMIO_DB_OPTIONS=$FORMIO_DB_OPTIONS" >> "$1/.env"
+    echo "CAMUNDA_DB_URL=$CAMUNDA_DB_URL" >> "$1/.env"
+    echo "CAMUNDA_DB_USER=$CAMUNDA_DB_USER" >> "$1/.env"
+    echo "CAMUNDA_DB_PASSWORD=$CAMUNDA_DB_PASSWORD" >> "$1/.env"
+    echo "CAMUNDA_DB_HOST=$CAMUNDA_DB_HOST" >> "$1/.env"
+    echo "CAMUNDA_DB_PORT=$CAMUNDA_DB_PORT" >> "$1/.env"
+    echo "CAMUNDA_DB_NAME=$CAMUNDA_DB_NAME" >> "$1/.env"
+    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-data-layer
+    sleep 5
+}
 
 # Function to start forms-flow-data-analysis-api
 forms_flow_data_analysis() {
@@ -250,6 +310,7 @@ main() {
         forms_flow_analytics "$1"
     fi
     forms_flow_api "$1" "$analytics"
+    forms_flow_data_layer "$1"
     forms_flow_documents "$1"
     forms_flow_web "$1"
     if [ "$forms_flow_data_analysis" -eq 1 ]; then
