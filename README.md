@@ -1,72 +1,35 @@
-# Download and Installation
-
-In the following document, we’ll describe about the different project dependencies, and the installation options being supported.
-
-## Table of Contents
-
-- [Download and Installation](#download-and-installation)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Download the formsflow.ai](#download-the-formsflowai)
-  - [Installation](#installation)
-    - [Docker Based Installation](#docker-based-installation)
-      - [Docker single click installation](#docker-single-click-installation)
-      - [Docker Full Deployment](#docker-full-deployment)
-    - [Openshift Based Installation](#openshift-based-installation)
-      - [Openshift Full Deployment](#openshift-full-deployment)
-  - [Verifying the Installation status](#verifying-the-installation-status)
-
-
-## Prerequisites
-
-* Admin access to a local or remote server (can be local Windows PC or Mac provided it is **64**-bit with at least **16GB** RAM and **25GB** HDD) 
-* For docker based installation [Docker](https://docker.com) needs to be installed.
-  * For **Mac**, make sure the [docker for mac](https://docs.docker.com/docker-for-mac/#resources) memory allocation is set to at least **16GB**. 
-
-## Download the formsflow.ai
-
-* Clone this github repo:  https://github.com/AOT-Technologies/forms-flow-ai-deployment.git
-
-## Installation
-
-There are multiple options for installing formsflow.ai. They are given below
-
-- Docker Based installation
-  - [Docker single click installation](#docker-single-click-installation)
-  - [Docker Full Deployment](#Docker-Full-Deployment)
-- Openshift Based Installation
-  - [Openshift Full Deployment](#Openshift-Full-Deployment)
-
-### Docker Based Installation
-
-------------------
-#### Docker single click installation
-
-Follow the instructions in the [documentation](https://aot-technologies.github.io/forms-flow-ai-doc/#quick_installation) and run the install.bat/bash for [quick installation](https://github.com/AOT-Technologies/forms-flow-ai-deployment/tree/main/scripts).
-
-#### Docker Full Deployment
-
-Follow the instructions on [docker installation guide](./docs/docker-compose/README.md)
+<div align="center"><img src=".images/logo.png"/></div>
+<hr/> 
  
- 
-### Openshift Based Installation
+[![FormsFlow WEB CI](https://github.com/AOT-Technologies/forms-flow-ai/actions/workflows/forms-flow-web-ci.yml/badge.svg)](https://github.com/AOT-Technologies/forms-flow-ai/actions)
+[![FormsFlow API CI](https://github.com/AOT-Technologies/forms-flow-ai/actions/workflows/forms-flow-api-ci.yml/badge.svg)](https://github.com/AOT-Technologies/forms-flow-ai/actions)
+[![FormsFlow BPM CI](https://github.com/AOT-Technologies/forms-flow-ai/actions/workflows/forms-flow-bpm-ci.yml/badge.svg)](https://github.com/AOT-Technologies/forms-flow-ai/actions)
+[![Join the chat at https://gitter.im/forms-flow-ai/community](https://badges.gitter.im/forms-flow-ai/community.svg)](https://gitter.im/forms-flow-ai/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://stackoverflow.com/questions/tagged/formsflow.ai](https://img.shields.io/badge/ask%20-on%20%20stackoverflow-F47F24)](https://stackoverflow.com/questions/tagged/formsflow.ai?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+<img src="https://img.shields.io/badge/release-v7.0.0-blue"/>
+<img src="https://img.shields.io/badge/LICENSE-Apache%202-green"/>
 
-------------------
-#### Openshift Full Deployment
+[**formsflow.ai**](https://formsflow.ai/) is a Free, Open-Source, Low Code Development Platform for rapidly building powerful business applications. [**formsflow.ai**](https://formsflow.ai/) combines leading Open-Source applications including [form.io](https://form.io) forms, Camunda’s workflow engine, Keycloak’s security, and Redash’s data analytics into a seamless, integrated platform.
 
- Follow the instructions on [openshift installation guide](./docs/helm/README.md)
- 
-## Verifying the Installation status
 
-> The following applications will be started and can be accessed in your browser.
+## How It Works ?
 
- Srl No | Service Name | Usage | Access | Default credentials (userName / Password)|
---- | --- | --- | --- | --- 
-1|`Keycloak`|Authentication|`http://localhost:8080`| `admin/changeme`
-2|`forms-flow-forms`|form.io form building. This must be started earlier for resource role id's creation|`http://localhost:3001`|`admin@example.com/changeme`
-3|`forms-flow-analytics`|Redash analytics server, This must be started earlier for redash key creation|`http://localhost:7001`|Use the credentials used for registration / [Default user credentials](./docs/forms-flow-ai-properties.md)
-4|`forms-flow-web`|formsflow Landing web app|`http://localhost:3000`|[Default user credentials](./docs/forms-flow-ai-properties.md)
-5|`forms-flow-api`|API services|`http://localhost:5001`|`Authorization tocken from keycloak role based user credentials`
-6|`forms-flow-bpm`|Camunda integration|`http://localhost:8000/camunda`| [Default user credentials](./docs/forms-flow-ai-properties.md) 
-7|`forms-flow-documents-api`|generate pdf with form submission data|`http://localhost:5006`| [Default user credentials](./docs/forms-flow-ai-properties.md) 
-8|`forms-flow-data-analysis-api`|Sentiment Analysis|`http://localhost:6001`| [Default user credentials](./docs/forms-flow-ai-properties.md) 
+Check out the [installation documentation](https://aot-technologies.github.io/forms-flow-installation-doc/) for installation instructions and [features documentation](https://aot-technologies.github.io/forms-flow-ai-doc) to explore features and capabilities in detail.
+
+
+## License
+
+Copyright 2020 AppsOnTime-Technologies 2020
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
