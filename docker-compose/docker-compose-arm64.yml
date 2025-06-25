@@ -420,7 +420,7 @@ services:
       CAMUNDA_DB_NAME: ${CAMUNDA_DB_NAME:-formsflow-bpm}
       CAMUNDA_DB_OPTIONS: ${CAMUNDA_DB_OPTIONS}
     networks:
-    - formsflow
+      - formsflow
 
 
 
