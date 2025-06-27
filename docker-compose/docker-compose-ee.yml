@@ -43,7 +43,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: formsflow/keycloak-customizations-ee:v7.1.0-alpha
+    image: formsflow/keycloak-customizations-ee:v7.1.0-rc
     restart: always
     tty: true
     stdin_open: true  
@@ -70,7 +70,7 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: formsflow/forms-flow-web-ee:v7.1.0-alpha
+    image: formsflow/forms-flow-web-ee:v7.1.0-rc
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
@@ -148,7 +148,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: formsflow/forms-flow-bpm-ee:v7.1.0-alpha
+    image: formsflow/forms-flow-bpm-ee:v7.1.0-rc
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -226,7 +226,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: formsflow/forms-flow-webapi-ee:v7.1.0-alpha
+    image: formsflow/forms-flow-webapi-ee:v7.1.0-rc
     restart: always
     links:
       - forms-flow-webapi-db
@@ -292,7 +292,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: formsflow/forms-flow-documents-api-ee:v7.1.0-alpha
+    image: formsflow/forms-flow-documents-api-ee:v7.1.0-rc
     restart: always
     links:
       - forms-flow-forms
@@ -342,7 +342,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api-ee:v7.1.0-alpha-trim
+    image: formsflow/forms-flow-data-analysis-api-ee:v7.1.0-rc-trim
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -368,7 +368,7 @@ services:
       - formsflow
 
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:v7.1.0-alpha
+    image: formsflow/forms-flow-data-layer:v7.1.0-rc
     container_name: forms-flow-data-layer
     restart: always
     ports:
