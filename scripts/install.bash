@@ -22,7 +22,7 @@ set_compose_command() {
 }
 
 fetch_valid_versions() {
-    valid_versions_url="https://tested-versions-docker-formsflow.aot-technologies.com/"
+    valid_versions_url="https://forms-flow-docker-versions.s3.ca-central-1.amazonaws.com/tested_versions.json"
     validVersions=$(curl -s "$valid_versions_url")
     if [ -z "$validVersions" ]; then
         echo "Failed to fetch the list of valid Docker versions from $valid_versions_url"
