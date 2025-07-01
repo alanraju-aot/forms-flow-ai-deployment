@@ -415,6 +415,7 @@ timeout /t 10 /nobreak >nul
 REM Setup Web
 echo Setting up forms-flow-web...
 echo Starting forms-flow-web container...
+echo GRAPHQL_API_URL=http://!ip_add!:5500/queries >> "!DOCKER_COMPOSE_DIR!\.env"
 !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-web
 if !ERRORLEVEL! neq 0 (
     echo ERROR: Failed to start forms-flow-web

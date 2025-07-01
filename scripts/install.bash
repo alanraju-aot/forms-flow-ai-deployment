@@ -138,7 +138,9 @@ forms_flow_forms() {
 # Function to start forms-flow-web
 forms_flow_web() {
     BPM_API_URL="http://$ip_add:8000/camunda"
+    GRAPHQL_API_URL="http://$ip_add:5500/queries"
     echo "BPM_API_URL=$BPM_API_URL" >> "$1/.env"
+    echo "GRAPHQL_API_URL=$GRAPHQL_API_URL" >> "$1/.env"
     $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-web
 }
 
