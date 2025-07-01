@@ -123,7 +123,7 @@ services:
       - formsflow
 
   forms-flow-forms:
-    image: formsflow/forms-flow-forms:v7.0.0
+    image: formsflow/forms-flow-forms:latest
     restart: always
     environment:
       DEBUG: formio:*
