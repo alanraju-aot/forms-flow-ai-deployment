@@ -56,15 +56,16 @@ EXIT /B %ERRORLEVEL%
 :: ##############################################################
 :: ##############################################################
 
-:clear-dir
-    if exist %~1 (
-        del /Q /S "config.js"
-   EXIT /B 0
 
 :clear-env
-    if exist %~1 (
-        del /Q /S ".env"
-   EXIT /B 0
+    if exist "%~1\.env" (
+        echo Removing environment file...
+        del /q "%~1\.env"
+    ) else (
+        echo .env not found in %~1
+    )
+    exit /b 0
+    
 	
 :: #############################################################
 :: ############# clearing dangling images ######################

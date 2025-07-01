@@ -2,6 +2,25 @@
 
 Mark  items as `Added`, `Changed`, `Fixed`, `Removed`, `Untested Features`, `Upcoming Features`, `Known Issues`
 
+## 7.1.0 - 2025-07-01
+
+`Added` 
+
+* Added a refined Windows installation script with improved execution flow and proper component installation order.
+* Added new componant named Forms-Flow-Data-Layer.
+* Updated the keycloak image to 26.1.2.
+
+`Modified`
+
+* Updated commands to fetch Docker and Docker Compose versions using the latest script format.
+* Refined environment variables in both docker-compose.yml and .env files.
+* Updated the list of working Docker versions, modified the script to reflect these changes, and added an S3 URL for   fetching Docker version details.  
+
+`Removed`
+
+* Removed all unwanted README.md files and refined the Repository
+
+
 ## 7.0.0 - 2025-01-10
 
 `Added` 
