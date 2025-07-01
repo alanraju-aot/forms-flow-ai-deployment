@@ -27,8 +27,8 @@ EXIT /B %ERRORLEVEL%
     call:forms-flow-all ..\docker-compose
     call:forms-flow-analytics ..\docker-compose
     call:prune-docker
-    call:clear-dir ..\docker-compose\configuration
     call:clear-env ..\docker-compose
+    call:remove-folders ..\docker-compose
     EXIT /B 0
    
 :: #############################################################
@@ -63,6 +63,22 @@ EXIT /B %ERRORLEVEL%
         del /q "%~1\.env"
     ) else (
         echo .env not found in %~1
+    )
+    exit /b 0
+
+:remove-folders
+    if exist "%~1\postgres" (
+        echo Removing postgres folder...
+        rmdir /s /q "%~1\postgres"
+    ) else (
+        echo postgres folder not found in %~1
+    )
+
+    if exist "%~1\mongodb" (
+        echo Removing mongodb folder...
+        rmdir /s /q "%~1\mongodb"
+    ) else (
+        echo mongodb folder not found in %~1
     )
     exit /b 0
     
