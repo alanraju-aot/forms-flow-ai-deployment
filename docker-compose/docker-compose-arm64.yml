@@ -43,7 +43,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: formsflow/keycloak-customizations:v7.1.0
+    image: formsflow/keycloak-customizations:latest
     restart: always
     tty: true
     stdin_open: true  
@@ -70,7 +70,7 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: formsflow/forms-flow-web:v7.1.0
+    image: formsflow/forms-flow-web:latest
     platform: linux/arm64/v8
     links:
       - forms-flow-webapi
@@ -154,7 +154,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: formsflow/forms-flow-bpm:v7.1.0
+    image: formsflow/forms-flow-bpm:latest
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -232,7 +232,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: formsflow/forms-flow-webapi:v7.1.0
+    image: formsflow/forms-flow-webapi:latest
     restart: always
     links:
       - forms-flow-webapi-db
@@ -387,7 +387,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api:v7.1.0
+    image: formsflow/forms-flow-data-analysis-api:latest
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -412,7 +412,7 @@ services:
     networks:
       - formsflow
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:v7.1.0
+    image: formsflow/forms-flow-data-layer:latest
     container_name: forms-flow-data-layer
     restart: always
     ports:
