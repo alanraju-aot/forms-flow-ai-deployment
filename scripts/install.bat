@@ -385,6 +385,7 @@ echo REDIS_URL=redis://!ip_add!:6379/0 >> "!DOCKER_COMPOSE_DIR!\.env"
 echo FORMSFLOW_DOC_API_URL=http://!ip_add!:5006 >> "!DOCKER_COMPOSE_DIR!\.env"
 echo DATA_ANALYSIS_URL=http://!ip_add!:6001 >> "!DOCKER_COMPOSE_DIR!\.env"
 echo BPM_API_URL=http://!ip_add!:8000/camunda >> "!DOCKER_COMPOSE_DIR!\.env"
+echo USER_NAME_DISPLAY_CLAIM=preferred_username >> "!DOCKER_COMPOSE_DIR!\.env"
 
 echo Starting forms-flow-bpm container...
 !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up --build -d forms-flow-bpm
