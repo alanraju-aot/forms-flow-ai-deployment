@@ -43,7 +43,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: formsflow/keycloak-customizations:latest
+    image: formsflow/keycloak-customizations:v7.2.0-alpha
     restart: always
     tty: true
     stdin_open: true  
@@ -70,7 +70,7 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: formsflow/forms-flow-web:latest
+    image: formsflow/forms-flow-web:v7.2.0-alpha
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
@@ -118,7 +118,7 @@ services:
       - formsflow
 
   forms-flow-forms:
-    image: formsflow/forms-flow-forms:latest
+    image: formsflow/forms-flow-forms:v7.2.0-alpha
     restart: always
     environment:
       DEBUG: formio:*
@@ -149,7 +149,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: formsflow/forms-flow-bpm:latest
+    image: formsflow/forms-flow-bpm:v7.2.0-alpha
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -227,7 +227,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: formsflow/forms-flow-webapi:latest
+    image: formsflow/forms-flow-webapi:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-webapi-db
@@ -293,7 +293,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: formsflow/forms-flow-documents-api:latest
+    image: formsflow/forms-flow-documents-api:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-forms
@@ -343,7 +343,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api:latest
+    image: formsflow/forms-flow-data-analysis-api:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -368,7 +368,7 @@ services:
     networks:
       - formsflow
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:latest
+    image: formsflow/forms-flow-data-layer:v7.2.0-alpha
     container_name: forms-flow-data-layer
     restart: always
     ports:

@@ -43,7 +43,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: formsflow/keycloak-customizations:latest
+    image: formsflow/keycloak-customizations:v7.2.0-alpha
     restart: always
     tty: true
     stdin_open: true  
@@ -70,17 +70,17 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: formsflow/forms-flow-web:latest
+    image: formsflow/forms-flow-web:v7.2.0-alpha
     platform: linux/arm64/v8
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
     environment:
-      # - MF_FORMSFLOW_WEB_URL=${MF_FORMSFLOW_WEB_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-web@v7.1.0/forms-flow-web.gz.js}
-      # - MF_FORMSFLOW_NAV_URL=${MF_FORMSFLOW_NAV_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v7.1.0/forms-flow-nav.gz.js}
-      # - MF_FORMSFLOW_SERVICE_URL=${MF_FORMSFLOW_SERVICE_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v7.1.0/forms-flow-service.gz.js}
-      # - MF_FORMSFLOW_ADMIN_URL=${MF_FORMSFLOW_ADMIN_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v7.1.0/forms-flow-admin.gz.js}
-      # - MF_FORMSFLOW_THEME_URL=${MF_FORMSFLOW_THEME_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-theme@v7.1.0/forms-flow-theme.gz.js}
+      # - MF_FORMSFLOW_WEB_URL=${MF_FORMSFLOW_WEB_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-web@v7.2.0-alpha/forms-flow-web.gz.js}
+      # - MF_FORMSFLOW_NAV_URL=${MF_FORMSFLOW_NAV_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v7.2.0-alpha/forms-flow-nav.gz.js}
+      # - MF_FORMSFLOW_SERVICE_URL=${MF_FORMSFLOW_SERVICE_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v7.2.0-alpha/forms-flow-service.gz.js}
+      # - MF_FORMSFLOW_ADMIN_URL=${MF_FORMSFLOW_ADMIN_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v7.2.0-alpha/forms-flow-admin.gz.js}
+      # - MF_FORMSFLOW_THEME_URL=${MF_FORMSFLOW_THEME_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-theme@v7.2.0-alpha/forms-flow-theme.gz.js}
       - NODE_ENV=${NODE_ENV:-production}
       - REACT_APP_API_SERVER_URL=${FORMIO_DEFAULT_PROJECT_URL}
       - REACT_APP_LANGUAGE=${LANGUAGE:-en}
@@ -124,7 +124,7 @@ services:
       - formsflow
 
   forms-flow-forms:
-    image: formsflow/forms-flow-forms:latest
+    image: formsflow/forms-flow-forms:v7.2.0-alpha
     restart: always
     environment:
       DEBUG: formio:*
@@ -155,7 +155,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: formsflow/forms-flow-bpm:latest
+    image: formsflow/forms-flow-bpm:v7.2.0-alpha
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -233,7 +233,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: formsflow/forms-flow-webapi:latest
+    image: formsflow/forms-flow-webapi:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-webapi-db
@@ -299,7 +299,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: formsflow/forms-flow-documents-api:v7.1.0-arm64
+    image: formsflow/forms-flow-documents-api:v7.2.0-alpha-arm64
     restart: always
     volumes:
       - ./:/app:rw
@@ -348,7 +348,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api:latest
+    image: formsflow/forms-flow-data-analysis-api:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -388,7 +388,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api:latest
+    image: formsflow/forms-flow-data-analysis-api:v7.2.0-alpha
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -413,7 +413,7 @@ services:
     networks:
       - formsflow
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:latest
+    image: formsflow/forms-flow-data-layer:v7.2.0-alpha
     container_name: forms-flow-data-layer
     restart: always
     ports:
