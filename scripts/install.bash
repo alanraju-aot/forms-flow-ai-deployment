@@ -138,6 +138,8 @@ forms_flow_forms() {
 # Function to start forms-flow-web
 forms_flow_web() {
     BPM_API_URL="http://$ip_add:8000/camunda"
+    GRAPHQL_API_URL="http://$ip_add:5500/queries"
+    echo "GRAPHQL_API_URL=$GRAPHQL_API_URL" >> "$1/.env"
     echo "BPM_API_URL=$BPM_API_URL" >> "$1/.env"
     $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-web
 }
@@ -152,6 +154,7 @@ forms_flow_bpm() {
     KEYCLOAK_URL_HTTP_RELATIVE_PATH="/auth"
     FORMSFLOW_DOC_API_URL="http://$ip_add:5006"
     DATA_ANALYSIS_URL="http://$ip_add:6001"
+    USER_NAME_DISPLAY_CLAIM="preferred_username"
 
 
 
@@ -163,6 +166,7 @@ forms_flow_bpm() {
     echo "FORMSFLOW_DOC_API_URL=$FORMSFLOW_DOC_API_URL" >> "$1/.env"
     echo "KEYCLOAK_URL_HTTP_RELATIVE_PATH=$KEYCLOAK_URL_HTTP_RELATIVE_PATH" >> "$1/.env"
     echo "DATA_ANALYSIS_URL=$DATA_ANALYSIS_URL" >> "$1/.env"
+    echo "USER_NAME_DISPLAY_CLAIM=$USER_NAME_DISPLAY_CLAIM" >> "$1/.env"
     $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-bpm
     sleep 6
 }
