@@ -1,4 +1,4 @@
-servicesservices:
+services:
   keycloak-db:
     image: postgres:latest
     restart: always
