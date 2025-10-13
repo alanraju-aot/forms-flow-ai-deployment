@@ -2,6 +2,17 @@
 
 Mark  items as `Added`, `Changed`, `Fixed`, `Removed`, `Untested Features`, `Upcoming Features`, `Known Issues`
 
+## 7.3.0 - 2025-10-14
+
+`Added` 
+
+* Added new env `REACT_APP_ENABLE_COMPACT_FORM_VIEW` for `forms-flow-web`
+
+`Modified`
+
+* Updated default value for `USER_NAME_DISPLAY_CLAIM` with 'preferred_username` value in bpm and webapi
+
+
 ## 7.1.0 - 2025-07-01
 
 `Added` 
