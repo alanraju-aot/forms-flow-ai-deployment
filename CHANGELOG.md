@@ -6,7 +6,7 @@ Mark  items as `Added`, `Changed`, `Fixed`, `Removed`, `Untested Features`, `Upc
 
 `Added` 
 
-* Added new env `REACT_APP_ENABLE_COMPACT_FORM_VIEW` for `forms-flow-web`
+* Added new env `REACT_APP_ENABLE_COMPACT_FORM_VIEW` for `forms-flow-web` and `ENABLE_COMPACT_FORM_VIEW` for `forms-flow-documents-api`
 
 `Modified`
 
