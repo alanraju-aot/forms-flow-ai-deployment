@@ -35,7 +35,7 @@ for /f "tokens=*" %%A in ('docker -v 2^>^&1') do (
 set "docker_version="
 for /f "tokens=3 delims= " %%A in ("!docker_info!") do (
     set "docker_version=%%A"
-    set "docker_version=!docker_version:,=!"
+    set "docker_version=!docker_version:,=! "
 )
 
 echo Docker version: !docker_version!
@@ -305,6 +305,17 @@ REM Set common properties
 echo Setting common properties...
 set "WEBSOCKET_ENCRYPT_KEY=giert989jkwrgb@DR55"
 set "KEYCLOAK_BPM_CLIENT_SECRET=e4bdbd25-1467-4f7f-b993-bc4b1944c943"
+
+REM ********** INSERT DYNAMIC IMAGE VARIABLES INTO .env **********
+REM If the script has set FORMS_FLOW_* variables earlier, write them to .env now.
+if defined FORMS_FLOW_WEB_IMAGE echo FORMS_FLOW_WEB_IMAGE=!FORMS_FLOW_WEB_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined FORMS_FLOW_BPM_IMAGE echo FORMS_FLOW_BPM_IMAGE=!FORMS_FLOW_BPM_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined FORMS_FLOW_FORMS_IMAGE echo FORMS_FLOW_FORMS_IMAGE=!FORMS_FLOW_FORMS_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined FORMS_FLOW_WEBAPI_IMAGE echo FORMS_FLOW_WEBAPI_IMAGE=!FORMS_FLOW_WEBAPI_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined FORMS_FLOW_DOCUMENTS_API_IMAGE echo FORMS_FLOW_DOCUMENTS_API_IMAGE=!FORMS_FLOW_DOCUMENTS_API_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined FORMS_FLOW_DATA_ANALYSIS_API_IMAGE echo FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=!FORMS_FLOW_DATA_ANALYSIS_API_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+if defined KEYCLOAK_CUSTOMIZATIONS_IMAGE echo KEYCLOAK_CUSTOMIZATIONS_IMAGE=!KEYCLOAK_CUSTOMIZATIONS_IMAGE! >> "!DOCKER_COMPOSE_DIR!\.env"
+REM **************************************************************
 
 REM Setup Keycloak
 echo Setting up Keycloak...
