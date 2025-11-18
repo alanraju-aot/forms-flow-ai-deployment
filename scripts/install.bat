@@ -53,11 +53,11 @@ if !fileSize! LSS 10 (
 echo Checking if your Docker version is tested...
 findstr /C:"%docker_version%" "%versionsFile%" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
-    echo ✅ Your Docker version %docker_version% is in the tested list.
+    echo Your Docker version %docker_version% is in the tested list.
     del "%versionsFile%" 2>nul
     goto SkipVersionCheck
 )
-echo ⚠️ WARNING: Your Docker version %docker_version% is not in the tested list!
+echo WARNING: Your Docker version %docker_version% is not in the tested list!
 set /p continue=Do you want to continue anyway? [y/n] 
 if /i "!continue!" neq "y" (
     echo Installation cancelled.
@@ -112,7 +112,7 @@ if defined DOCKER_OSTYPE (
     set "DOCKER_OSTYPE=!DOCKER_OSTYPE: =!"
 )
 if /i "!DOCKER_OSTYPE!"=="windows" (
-    echo ❌ ERROR: Docker is using Windows containers.
+    echo ERROR: Docker is using Windows containers.
     echo Please switch Docker Desktop to "Use Linux containers" and re-run.
     pause
     exit /b 1
@@ -131,14 +131,22 @@ echo   1. Open Source (Community Edition)
 echo   2. Premium (Enterprise Edition)
 set /p "editionChoice=Enter your choice [1-2]: "
 
+REM Properly handle edition selection
 if "!editionChoice!"=="2" (
     set "EDITION=ee"
-    echo Selected: Premium (Enterprise Edition)
+    echo.
+    echo ============================================
+    echo Selected: Premium ^(Enterprise Edition^)
+    echo ============================================
+    echo.
 ) else (
     set "EDITION=ce"
-    echo Selected: Open Source (Community Edition)
+    echo.
+    echo ============================================
+    echo Selected: Open Source ^(Community Edition^)
+    echo ============================================
+    echo.
 )
-echo.
 
 REM --- Locate docker-compose files ---
 echo Locating docker-compose files...
@@ -173,6 +181,10 @@ if /i "!includeAnalytics!"=="y" (
     echo Analytics will not be included.
 )
 echo.
+echo Sentiment Analysis enables assessment of sentiments within forms by
+echo considering specific topics specified during form creation.
+echo The data analysis API provides interfaces for sentiment analysis.
+echo.
 set /p "includeDataAnalysis=Do you want to include forms-flow-data-analysis-api? [y/n] "
 if /i "!includeDataAnalysis!"=="y" (
     set "dataanalysis=1"
@@ -191,13 +203,17 @@ if "!analytics!"=="1" (
     )
 )
 
+echo.
+echo ============================================
 echo Installation summary:
+echo ============================================
 echo - IP Address: !ip_add!
 echo - Edition: !EDITION!
 echo - Architecture: !ARCH!
 echo - PLATFORM: !PLATFORM!
 echo - Analytics: !analytics!
 echo - Data Analysis: !dataanalysis!
+echo ============================================
 echo.
 set /p "confirmInstall=Begin installation with these settings? [y/n] "
 if /i "!confirmInstall!" neq "y" (
@@ -209,40 +225,65 @@ if /i "!confirmInstall!" neq "y" (
 REM --- Set version ---
 set "FORMSFLOW_VERSION=v7.3.0"
 
-REM --- Configure image names based on architecture and edition ---
-set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=formsflow/keycloak-customizations"
-set "FORMS_FLOW_WEB_IMAGE=formsflow/forms-flow-web"
-set "FORMS_FLOW_BPM_IMAGE=formsflow/forms-flow-bpm"
-set "FORMS_FLOW_WEBAPI_IMAGE=formsflow/forms-flow-webapi"
-set "FORMS_FLOW_DOCUMENTS_API_IMAGE=formsflow/forms-flow-documents-api"
-set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=formsflow/forms-flow-data-analysis-api"
-set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!"
-set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!"
+REM --- Configure image names based on edition and architecture ---
+REM According to the documentation:
+REM - CE images: formsflow/service-name
+REM - EE images: formsflow/service-name-ee
+REM - Documents API has architecture-specific tags
+REM - Data Analysis API (EE AMD64 only) uses -trim tag
 
-REM Apply edition suffix
+echo.
+echo Configuring images for Edition: !EDITION!, Architecture: !ARCH!
+
+REM Set base image names according to edition
 if "!EDITION!"=="ee" (
-    set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=!KEYCLOAK_CUSTOMIZATIONS_IMAGE!-ee"
-    set "FORMS_FLOW_WEB_IMAGE=!FORMS_FLOW_WEB_IMAGE!-ee"
-    set "FORMS_FLOW_BPM_IMAGE=!FORMS_FLOW_BPM_IMAGE!-ee"
-    set "FORMS_FLOW_WEBAPI_IMAGE=!FORMS_FLOW_WEBAPI_IMAGE!-ee"
-    set "FORMS_FLOW_DOCUMENTS_API_IMAGE=!FORMS_FLOW_DOCUMENTS_API_IMAGE!-ee"
-    set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=!FORMS_FLOW_DATA_ANALYSIS_API_IMAGE!-ee"
+    echo Applying Enterprise Edition configuration...
+    set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=formsflow/keycloak-customizations-ee"
+    set "FORMS_FLOW_WEB_IMAGE=formsflow/forms-flow-web-ee"
+    set "FORMS_FLOW_BPM_IMAGE=formsflow/forms-flow-bpm-ee"
+    set "FORMS_FLOW_WEBAPI_IMAGE=formsflow/forms-flow-webapi-ee"
+    set "FORMS_FLOW_DOCUMENTS_API_IMAGE=formsflow/forms-flow-documents-api-ee"
+    set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=formsflow/forms-flow-data-analysis-api-ee"
+) else (
+    echo Applying Community Edition configuration...
+    set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=formsflow/keycloak-customizations"
+    set "FORMS_FLOW_WEB_IMAGE=formsflow/forms-flow-web"
+    set "FORMS_FLOW_BPM_IMAGE=formsflow/forms-flow-bpm"
+    set "FORMS_FLOW_WEBAPI_IMAGE=formsflow/forms-flow-webapi"
+    set "FORMS_FLOW_DOCUMENTS_API_IMAGE=formsflow/forms-flow-documents-api"
+    set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=formsflow/forms-flow-data-analysis-api"
 )
 
-REM Apply architecture-specific settings
+REM Configure tags based on architecture and edition
+REM Documents API: Only service with architecture-specific images
 if "!ARCH!"=="arm64" (
-    REM ARM64 specific image tags
-    if "!EDITION!"=="ee" (
-        set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!-arm64"
-    ) else (
-        set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!-arm64"
-    )
+    echo Applying ARM64-specific configuration...
+    set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!-arm64"
+    set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!"
 ) else (
-    REM AMD64 specific - EE has special tag for data-analysis-api
+    echo Applying AMD64-specific configuration...
+    set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!"
+    REM Data Analysis API: EE on AMD64 uses -trim tag
     if "!EDITION!"=="ee" (
         set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!-trim"
+    ) else (
+        set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!"
     )
 )
+
+REM Display final image configuration
+echo.
+echo ============================================
+echo Final Image Configuration:
+echo ============================================
+echo KEYCLOAK_CUSTOMIZATIONS_IMAGE=!KEYCLOAK_CUSTOMIZATIONS_IMAGE!:!FORMSFLOW_VERSION!
+echo FORMS_FLOW_WEB_IMAGE=!FORMS_FLOW_WEB_IMAGE!:!FORMSFLOW_VERSION!
+echo FORMS_FLOW_BPM_IMAGE=!FORMS_FLOW_BPM_IMAGE!:!FORMSFLOW_VERSION!
+echo FORMS_FLOW_WEBAPI_IMAGE=!FORMS_FLOW_WEBAPI_IMAGE!:!FORMSFLOW_VERSION!
+echo FORMS_FLOW_DOCUMENTS_API_IMAGE=!FORMS_FLOW_DOCUMENTS_API_IMAGE!:!DOCUMENTS_API_TAG!
+echo FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=!FORMS_FLOW_DATA_ANALYSIS_API_IMAGE!:!DATA_ANALYSIS_API_TAG!
+echo ============================================
+echo.
 
 REM --- Create .env file ---
 echo Creating .env file...
@@ -298,6 +339,7 @@ echo KEYCLOAK_URL_HTTP_RELATIVE_PATH=/auth
 echo KEYCLOAK_BPM_CLIENT_ID=forms-flow-bpm
 echo KEYCLOAK_BPM_CLIENT_SECRET=e4bdbd25-1467-4f7f-b993-bc4b1944c943
 echo KEYCLOAK_WEB_CLIENT_ID=forms-flow-web
+echo KEYCLOAK_ENABLE_CLIENT_AUTH=false
 echo.
 echo # API URLs
 echo FORMIO_DEFAULT_PROJECT_URL=http://!ip_add!:3001
@@ -305,6 +347,7 @@ echo FORMSFLOW_API_URL=http://!ip_add!:5001
 echo BPM_API_URL=http://!ip_add!:8000/camunda
 echo DOCUMENT_SERVICE_URL=http://!ip_add!:5006
 echo DATA_ANALYSIS_URL=http://!ip_add!:6001
+echo DATA_ANALYSIS_API_BASE_URL=http://!ip_add!:6001
 echo.
 echo # Application Configuration
 echo APPLICATION_NAME=formsflow.ai
@@ -331,12 +374,52 @@ echo ENABLE_TASKS_MODULE=true
 echo ENABLE_DASHBOARDS_MODULE=true
 echo ENABLE_PROCESSES_MODULE=true
 echo ENABLE_APPLICATIONS_MODULE=true
+echo ENABLE_APPLICATIONS_ACCESS_PERMISSION_CHECK=false
+echo.
+echo # Formio Configuration
+echo FORMIO_ROOT_EMAIL=admin@example.com
+echo FORMIO_ROOT_PASSWORD=changeme
+echo NO_INSTALL=1
+echo.
+echo # Camunda Configuration
+echo CAMUNDA_JDBC_URL=jdbc:postgresql://forms-flow-bpm-db:5432/formsflow-bpm
+echo CAMUNDA_JDBC_DRIVER=org.postgresql.Driver
+echo CAMUNDA_APP_ROOT_LOG_FLAG=error
+echo.
+echo # Database Connection Strings
+echo FORMSFLOW_API_DB_URL=postgresql://postgres:changeme@forms-flow-webapi-db:5432/webapi
+echo FORMSFLOW_API_DB_HOST=forms-flow-webapi-db
+echo FORMSFLOW_API_DB_PORT=5432
+echo.
+echo # Additional Configuration
+echo APP_SECURITY_ORIGIN=*
+echo FORMSFLOW_API_CORS_ORIGINS=*
+echo CONFIGURE_LOGS=true
+echo API_LOG_ROTATION_WHEN=d
+echo API_LOG_ROTATION_INTERVAL=1
+echo API_LOG_BACKUP_COUNT=7
+echo DATE_FORMAT=DD-MM-YY
+echo TIME_FORMAT=hh:mm:ss A
+echo USER_NAME_DISPLAY_CLAIM=preferred_username
+echo ENABLE_COMPACT_FORM_VIEW=false
+echo.
+echo # Worker Configuration
+echo GUNICORN_WORKERS=5
+echo GUNICORN_THREADS=10
+echo GUNICORN_TIMEOUT=120
+echo FORMSFLOW_DATA_LAYER_WORKERS=4
 ) > "!DOCKER_COMPOSE_DIR!\.env"
 
 echo .env file created successfully!
 echo.
 
 REM --- Start Keycloak first ---
+echo ***********************************************
+echo *        Starting Keycloak container...        *
+echo ***********************************************
+
+echo .env file created successfully!
+echo.
 echo ***********************************************
 echo *        Starting Keycloak container...        *
 echo ***********************************************
@@ -351,32 +434,19 @@ timeout /t 25 /nobreak >nul
 echo Keycloak is up.
 echo.
 
-REM --- Start Analytics Next (if selected) ---
+REM --- Start Analytics (if selected) ---
 if "!analytics!"=="1" (
-    echo [DEBUG] Analytics is set to 1
     if defined ANALYTICS_COMPOSE_FILE (
-        echo [DEBUG] ANALYTICS_COMPOSE_FILE is defined as: !ANALYTICS_COMPOSE_FILE!
-        echo ***********************************************
-        echo *        Starting Analytics Containers...      *
-        echo ***********************************************
-        echo [DEBUG] About to run: !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" up -d
-        call !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" up -d
+        call :ConfigureRedash
         if errorlevel 1 (
-            echo ERROR: Failed to start analytics containers.
+            echo ERROR: Failed to configure or start analytics.
             pause
             exit /b 1
         )
-        echo Waiting for Analytics ^(Redash^) to initialize...
-        timeout /t 25 /nobreak >nul
-        set /p "INSIGHT_API_KEY=Enter your Redash API key: "
-        set "INSIGHT_API_URL=http://!ip_add!:7001"
-        echo INSIGHT_API_KEY=!INSIGHT_API_KEY!>>"!DOCKER_COMPOSE_DIR!\.env"
-        echo INSIGHT_API_URL=!INSIGHT_API_URL!>>"!DOCKER_COMPOSE_DIR!\.env"
     ) else (
         echo WARNING: analytics compose file not found; skipping analytics setup.
     )
 )
-echo.
 
 REM --- Start Main Stack ---
 echo ***********************************************
@@ -397,7 +467,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo ✅ formsflow.ai installation completed successfully!
+echo ============================================
+echo formsflow.ai installation completed successfully!
+echo ============================================
 echo.
 echo Access points:
 echo   - FormsFlow Web: http://!ip_add!:3000
@@ -415,6 +487,95 @@ echo Default credentials:
 echo   - Username: admin
 echo   - Password: changeme
 echo.
+echo Edition installed: !EDITION! ^(!ARCH!^)
+echo.
 pause
 endlocal
+exit /b 0
+
+:ConfigureRedash
+REM Subroutine to configure and start Redash analytics
+echo ***********************************************
+echo *     Configuring Analytics (Redash)...       *
+echo ***********************************************
+
+REM Use the same configuration as the working script
+set "REDASH_HOST=http://!ip_add!:7001"
+set "PYTHONUNBUFFERED=0"
+set "REDASH_LOG_LEVEL=INFO"
+set "REDASH_REDIS_URL=redis://redis:6379/0"
+set "POSTGRES_USER=postgres"
+set "POSTGRES_PASSWORD=changeme"
+set "POSTGRES_DB=postgres"
+set "REDASH_COOKIE_SECRET=redash-selfhosted"
+set "REDASH_SECRET_KEY=redash-selfhosted"
+set "REDASH_DATABASE_URL=postgresql://postgres:changeme@postgres/postgres"
+set "REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=*"
+set "REDASH_REFERRER_POLICY=no-referrer-when-downgrade"
+set "REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=Content-Type, Authorization"
+
+echo Configuring Redash...
+
+REM Add Redash configuration to .env file
+echo.>>"!DOCKER_COMPOSE_DIR!\.env"
+echo # Redash Analytics Configuration>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_HOST=!REDASH_HOST!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo PYTHONUNBUFFERED=!PYTHONUNBUFFERED!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_LOG_LEVEL=!REDASH_LOG_LEVEL!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_REDIS_URL=!REDASH_REDIS_URL!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo POSTGRES_USER=!POSTGRES_USER!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo POSTGRES_PASSWORD=!POSTGRES_PASSWORD!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo POSTGRES_DB=!POSTGRES_DB!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_COOKIE_SECRET=!REDASH_COOKIE_SECRET!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_SECRET_KEY=!REDASH_SECRET_KEY!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_DATABASE_URL=!REDASH_DATABASE_URL!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=!REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_REFERRER_POLICY=!REDASH_REFERRER_POLICY!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=!REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS!>>"!DOCKER_COMPOSE_DIR!\.env"
+
+echo Redash configuration complete.
+echo.
+
+echo ***********************************************
+echo *     Creating Analytics Database...           *
+echo ***********************************************
+echo Creating analytics database...
+call !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" run --rm server create_db
+if errorlevel 1 (
+    echo WARNING: Database creation may have failed, but continuing...
+)
+
+echo ***********************************************
+echo *        Starting Analytics Containers...      *
+echo ***********************************************
+call !COMPOSE_COMMAND! -p formsflow-ai -f "!ANALYTICS_COMPOSE_FILE!" up -d
+if errorlevel 1 (
+    echo ERROR: Failed to start analytics containers.
+    echo Please check the logs with: docker logs redash
+    exit /b 1
+)
+
+echo Waiting for Analytics (Redash) to initialize...
+timeout /t 15 /nobreak >nul
+
+echo.
+echo ============================================
+echo Redash is now running at: http://!ip_add!:7001
+echo ============================================
+echo.
+echo IMPORTANT: To complete Redash setup:
+echo 1. Open http://!ip_add!:7001 in your browser
+echo 2. Create an admin account
+echo 3. Go to Settings -^> API Key to generate an API key
+echo 4. Copy the API key for the next step
+echo.
+
+REM Add INSIGHT_API_URL to .env
+echo INSIGHT_API_URL=http://!ip_add!:7001>>"!DOCKER_COMPOSE_DIR!\.env"
+
+REM Prompt for API key
+set /p "INSIGHT_API_KEY=Enter your Redash API key: "
+echo INSIGHT_API_KEY=!INSIGHT_API_KEY!>>"!DOCKER_COMPOSE_DIR!\.env"
+echo API key saved to .env file.
+
 exit /b 0

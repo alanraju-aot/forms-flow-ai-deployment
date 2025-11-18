@@ -1,178 +1,404 @@
 #!/bin/bash
 
-# Function to set the appropriate Docker Compose file based on the architecture
-set_docker_compose_file() {
-    docker_compose_file='docker-compose.yml'
-    if [ "$(uname -m)" == "arm64" ]; then
-        docker_compose_file='docker-compose-arm64.yml'
-    fi
-}
+echo "*******************************************"
+echo "*     formsflow.ai Installation Script    *"
+echo "*******************************************"
+echo ""
 
-# Function to check for the appropriate Docker Compose command
-set_compose_command() {
-    if command -v docker compose &> /dev/null; then
-        compose_cmd="docker compose"
-    elif command -v docker-compose &> /dev/null; then
-        compose_cmd="docker-compose"
-    else
-        echo "Neither 'docker compose' nor 'docker-compose' is installed. Please install Docker Compose to continue."
-        exit 1
-    fi
-    echo "Using $compose_cmd for managing containers."
-}
+# Detect Docker Compose
+COMPOSE_COMMAND=""
+if docker compose version &>/dev/null; then
+    COMPOSE_COMMAND="docker compose"
+elif docker-compose version &>/dev/null; then
+    COMPOSE_COMMAND="docker-compose"
+else
+    echo "ERROR: Neither docker compose nor docker-compose is installed."
+    echo "Please install Docker Desktop or Docker Engine with Compose."
+    exit 1
+fi
+echo "Using $COMPOSE_COMMAND"
 
-fetch_valid_versions() {
-    valid_versions_url="https://forms-flow-docker-versions.s3.ca-central-1.amazonaws.com/tested_versions.json"
-    validVersions=$(curl -s "$valid_versions_url")
-    if [ -z "$validVersions" ]; then
-        echo "Failed to fetch the list of valid Docker versions from $valid_versions_url"
-        exit 1
-    fi
-    echo "Fetched valid Docker versions successfully."
+# Get Docker version
+docker_info=$(docker -v 2>&1)
+docker_version=$(echo "$docker_info" | awk '{print $3}' | tr -d ',')
+echo "Docker version: $docker_version"
 
-    # Run the docker -v command and capture its output
-    docker_info=$(docker -v 2>&1)
-
-    # Extract the Docker version using string manipulation
-    docker_version=$(echo "$docker_info" | awk '{print $3}' | tr -d ,)
-
-    # Display the extracted Docker version
-    echo "Docker version: $docker_version"
-}
-
-check_valid_version() {
-  if echo "$validVersions" | grep -q "\"$docker_version\""; then
-     echo "Your Docker version $docker_version is tested and working!"
-  else
-     echo "This Docker version is not tested!"
-     read -p "Do you want to continue? [y/n]: " continue
-     if [ "$continue" != "y" ]; then
-        exit
-     fi
-  fi
-}
-
-# Function to check if the web API is up
-isUp() {
-    while true; do
-        HTTP=$(curl -LI "http://$ip_add:5001" -o /dev/null -w "%{http_code}" -s)
-        if [ "$HTTP" == "200" ]; then
-            echo "formsflow.ai is successfully installed."
-            exit 0
+# --- Docker Version Validation ---
+url="https://forms-flow-docker-versions.s3.ca-central-1.amazonaws.com/docker_versions.html"
+versionsFile="tested_versions.tmp"
+echo "Fetching tested Docker versions from $url..."
+if command -v curl &>/dev/null; then
+    curl -L -s "$url" -o "$versionsFile" 2>/dev/null
+    
+    if [ -f "$versionsFile" ] && [ -s "$versionsFile" ]; then
+        echo "Checking if your Docker version is tested..."
+        if grep -q "$docker_version" "$versionsFile"; then
+            echo "Your Docker version $docker_version is in the tested list."
+            rm -f "$versionsFile"
         else
-            echo "Finishing setup."
-            sleep 6
+            echo "WARNING: Your Docker version $docker_version is not in the tested list!"
+            read -p "Do you want to continue anyway? [y/n] " continue
+            if [[ ! "$continue" =~ ^[Yy]$ ]]; then
+                echo "Installation cancelled."
+                rm -f "$versionsFile"
+                exit 1
+            fi
+            rm -f "$versionsFile"
+            echo "Continuing with untested Docker version..."
         fi
-    done
-}
-
-# Function to find the IPv4 address
-find_my_ip() {
-   # ipadd=$(hostname -I | awk '{print $1}')
-    if [ "$(uname)" = "Darwin" ]; then
-        ipadd=$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
-    elif [ "$(uname)" = "Linux" ]; then
-        ipadd=$(hostname -I | awk '{print $1}')
-    fi
-    ip_add=$ipadd
-    read -p "Confirm that your IPv4 address is $ip_add? [y/n]: " choice
-    if [ "$choice" != "y" ]; then
-        read -p "What is your IPv4 address? " ip_add
-    fi
-}
-
-# Fuction to ask prompt questions
-prompt_question() {
-    # Ask about analytics installation
-    read -p "Do you want analytics to include in the installation? [y/n]: " choice
-    if [ "$choice" == "y" ]; then
-        analytics=1
     else
+        echo "Failed to fetch tested versions. Skipping validation."
+        rm -f "$versionsFile"
+    fi
+else
+    echo "curl not found, skipping version validation."
+fi
+echo ""
+
+# --- Detect IP address automatically ---
+echo "Finding your IP address..."
+ip_add=""
+
+# Try different methods to get IP
+if command -v ip &>/dev/null; then
+    ip_add=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+elif command -v ifconfig &>/dev/null; then
+    ip_add=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
+elif command -v hostname &>/dev/null; then
+    ip_add=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+
+if [ -z "$ip_add" ]; then
+    echo "WARNING: Could not automatically detect your IP address."
+    read -p "Please enter your IP address manually: " ip_add
+else
+    echo "Detected IP address: $ip_add"
+    read -p "Is this correct? [y/n] " confirmIP
+    if [[ ! "$confirmIP" =~ ^[Yy]$ ]]; then
+        read -p "Please enter your correct IP address: " ip_add
+    fi
+fi
+echo "IP address set to: $ip_add"
+echo ""
+
+# --- Detect architecture ---
+echo "Detecting system architecture..."
+machine_arch=$(uname -m)
+if [[ "$machine_arch" == "aarch64" || "$machine_arch" == "arm64" ]]; then
+    ARCH="arm64"
+else
+    ARCH="amd64"
+fi
+echo "Detected architecture: $ARCH"
+echo ""
+
+# --- Check Docker OSType ---
+DOCKER_OSTYPE=$(docker info 2>/dev/null | grep "OSType" | awk '{print $2}')
+if [ -n "$DOCKER_OSTYPE" ]; then
+    DOCKER_OSTYPE=$(echo "$DOCKER_OSTYPE" | tr -d ' ')
+fi
+
+if [[ "$DOCKER_OSTYPE" == "windows" ]]; then
+    echo "ERROR: Docker is using Windows containers."
+    echo "Please switch Docker Desktop to 'Use Linux containers' and re-run."
+    exit 1
+fi
+
+if [ "$ARCH" == "amd64" ]; then
+    PLATFORM="linux/amd64"
+else
+    PLATFORM="linux/arm64/v8"
+fi
+echo "Using PLATFORM: $PLATFORM"
+echo ""
+
+# --- Select edition ---
+echo "Select installation type:"
+echo "  1. Open Source (Community Edition)"
+echo "  2. Premium (Enterprise Edition)"
+read -p "Enter your choice [1-2]: " editionChoice
+
+if [ "$editionChoice" == "2" ]; then
+    EDITION="ee"
+    echo ""
+    echo "============================================"
+    echo "Selected: Premium (Enterprise Edition)"
+    echo "============================================"
+    echo ""
+else
+    EDITION="ce"
+    echo ""
+    echo "============================================"
+    echo "Selected: Open Source (Community Edition)"
+    echo "============================================"
+    echo ""
+fi
+
+# --- Locate docker-compose files ---
+echo "Locating docker-compose files..."
+COMPOSE_FILE=""
+ANALYTICS_COMPOSE_FILE=""
+
+if [ -f "../docker-compose/docker-compose.yml" ]; then
+    COMPOSE_FILE="../docker-compose/docker-compose.yml"
+    DOCKER_COMPOSE_DIR="../docker-compose"
+    echo "Found docker-compose.yml."
+fi
+
+if [ -f "$DOCKER_COMPOSE_DIR/analytics-docker-compose.yml" ]; then
+    ANALYTICS_COMPOSE_FILE="$DOCKER_COMPOSE_DIR/analytics-docker-compose.yml"
+    echo "Found analytics-docker-compose.yml."
+fi
+
+echo "Using compose file: $COMPOSE_FILE"
+echo ""
+
+if [ -z "$COMPOSE_FILE" ]; then
+    echo "ERROR: Could not find docker-compose file. Expected '../docker-compose/docker-compose.yml'."
+    echo "Please ensure you are running this installer from the repository root or that the docker-compose files exist."
+    exit 1
+fi
+
+# --- Analytics & Data Analysis selections ---
+read -p "Do you want to include analytics in the installation? [y/n] " includeAnalytics
+if [[ "$includeAnalytics" =~ ^[Yy]$ ]]; then
+    analytics=1
+    echo "Analytics will be included."
+else
+    analytics=0
+    echo "Analytics will not be included."
+fi
+echo ""
+
+echo "Sentiment Analysis enables assessment of sentiments within forms by"
+echo "considering specific topics specified during form creation."
+echo "The data analysis API provides interfaces for sentiment analysis."
+echo ""
+read -p "Do you want to include forms-flow-data-analysis-api? [y/n] " includeDataAnalysis
+if [[ "$includeDataAnalysis" =~ ^[Yy]$ ]]; then
+    dataanalysis=1
+    echo "Data Analysis API will be included."
+else
+    dataanalysis=0
+    echo "Data Analysis API will not be included."
+fi
+echo ""
+
+# If analytics requested but analytics compose file is missing, warn and skip analytics
+if [ "$analytics" == "1" ]; then
+    if [ -z "$ANALYTICS_COMPOSE_FILE" ]; then
+        echo "WARNING: analytics compose file not found; skipping analytics setup."
         analytics=0
     fi
+fi
 
-    # Ask about forms-flow-data-analysis-api installation
-    echo "For open-source: Sentiment analysis allows assessing sentiments within forms by considering specific topics specified by the designer."
-    read -p "Do you want to install forms-flow-data-analysis-api? [y/n]: " Choice
-    if [ "$Choice" == "y" ]; then
-        forms_flow_data_analysis=1
+echo ""
+echo "============================================"
+echo "Installation summary:"
+echo "============================================"
+echo "- IP Address: $ip_add"
+echo "- Edition: $EDITION"
+echo "- Architecture: $ARCH"
+echo "- PLATFORM: $PLATFORM"
+echo "- Analytics: $analytics"
+echo "- Data Analysis: $dataanalysis"
+echo "============================================"
+echo ""
+read -p "Begin installation with these settings? [y/n] " confirmInstall
+if [[ ! "$confirmInstall" =~ ^[Yy]$ ]]; then
+    echo "Installation cancelled."
+    exit 0
+fi
+
+# --- Set version ---
+FORMSFLOW_VERSION="v7.3.0"
+
+# --- Configure image names based on edition and architecture ---
+echo ""
+echo "Configuring images for Edition: $EDITION, Architecture: $ARCH"
+
+# Set base image names according to edition
+if [ "$EDITION" == "ee" ]; then
+    echo "Applying Enterprise Edition configuration..."
+    KEYCLOAK_CUSTOMIZATIONS_IMAGE="formsflow/keycloak-customizations-ee"
+    FORMS_FLOW_WEB_IMAGE="formsflow/forms-flow-web-ee"
+    FORMS_FLOW_BPM_IMAGE="formsflow/forms-flow-bpm-ee"
+    FORMS_FLOW_WEBAPI_IMAGE="formsflow/forms-flow-webapi-ee"
+    FORMS_FLOW_DOCUMENTS_API_IMAGE="formsflow/forms-flow-documents-api-ee"
+    FORMS_FLOW_DATA_ANALYSIS_API_IMAGE="formsflow/forms-flow-data-analysis-api-ee"
+else
+    echo "Applying Community Edition configuration..."
+    KEYCLOAK_CUSTOMIZATIONS_IMAGE="formsflow/keycloak-customizations"
+    FORMS_FLOW_WEB_IMAGE="formsflow/forms-flow-web"
+    FORMS_FLOW_BPM_IMAGE="formsflow/forms-flow-bpm"
+    FORMS_FLOW_WEBAPI_IMAGE="formsflow/forms-flow-webapi"
+    FORMS_FLOW_DOCUMENTS_API_IMAGE="formsflow/forms-flow-documents-api"
+    FORMS_FLOW_DATA_ANALYSIS_API_IMAGE="formsflow/forms-flow-data-analysis-api"
+fi
+
+# Configure tags based on architecture and edition
+if [ "$ARCH" == "arm64" ]; then
+    echo "Applying ARM64-specific configuration..."
+    DOCUMENTS_API_TAG="$FORMSFLOW_VERSION-arm64"
+    DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION"
+else
+    echo "Applying AMD64-specific configuration..."
+    DOCUMENTS_API_TAG="$FORMSFLOW_VERSION"
+    if [ "$EDITION" == "ee" ]; then
+        DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION-trim"
     else
-        forms_flow_data_analysis=0
+        DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION"
     fi
+fi
 
-    # Export variables to make them available in the main function
-    export analytics
-    export forms_flow_data_analysis
-}
+# Display final image configuration
+echo ""
+echo "============================================"
+echo "Final Image Configuration:"
+echo "============================================"
+echo "KEYCLOAK_CUSTOMIZATIONS_IMAGE=$KEYCLOAK_CUSTOMIZATIONS_IMAGE:$FORMSFLOW_VERSION"
+echo "FORMS_FLOW_WEB_IMAGE=$FORMS_FLOW_WEB_IMAGE:$FORMSFLOW_VERSION"
+echo "FORMS_FLOW_BPM_IMAGE=$FORMS_FLOW_BPM_IMAGE:$FORMSFLOW_VERSION"
+echo "FORMS_FLOW_WEBAPI_IMAGE=$FORMS_FLOW_WEBAPI_IMAGE:$FORMSFLOW_VERSION"
+echo "FORMS_FLOW_DOCUMENTS_API_IMAGE=$FORMS_FLOW_DOCUMENTS_API_IMAGE:$DOCUMENTS_API_TAG"
+echo "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=$FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:$DATA_ANALYSIS_API_TAG"
+echo "============================================"
+echo ""
 
+# --- Create .env file ---
+echo "Creating .env file..."
+cat > "$DOCKER_COMPOSE_DIR/.env" << EOF
+# FormsFlow.ai Configuration
+# Generated on $(date)
+# Architecture: $ARCH
+# Edition: $EDITION
 
-# Function to set common properties
-set_common_properties() {
-    WEBSOCKET_ENCRYPT_KEY="giert989jkwrgb@DR55"
-    KEYCLOAK_BPM_CLIENT_SECRET="e4bdbd25-1467-4f7f-b993-bc4b1944c943"
-    export WEBSOCKET_ENCRYPT_KEY
-    export KEYCLOAK_BPM_CLIENT_SECRET
-}
+# Version
+FORMSFLOW_VERSION=$FORMSFLOW_VERSION
 
-# Function to start Keycloak
-keycloak() {
-    cd ../docker-compose/
-    if [ -f "$1/.env" ]; then
-        rm "$1/.env"
-    fi
-    echo KEYCLOAK_START_MODE=start-dev >> .env
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d keycloak
-    sleep 5
-    KEYCLOAK_URL="http://$ip_add:8080"
-    export KEYCLOAK_URL
-}
+# Architecture and Platform
+ARCHITECTURE=$ARCH
+PLATFORM=$PLATFORM
 
-# Function to start forms-flow-forms
-forms_flow_forms() {
-    FORMIO_DEFAULT_PROJECT_URL="http://$ip_add:3001"
-    echo "FORMIO_DEFAULT_PROJECT_URL=$FORMIO_DEFAULT_PROJECT_URL" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-forms
-    sleep 5
-}
+# Edition
+EDITION=$EDITION
 
-# Function to start forms-flow-web
-forms_flow_web() {
-    BPM_API_URL="http://$ip_add:8000/camunda"
-    GRAPHQL_API_URL="http://$ip_add:5500/queries"
-    echo "GRAPHQL_API_URL=$GRAPHQL_API_URL" >> "$1/.env"
-    echo "BPM_API_URL=$BPM_API_URL" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-web
-}
+# Image Names
+KEYCLOAK_CUSTOMIZATIONS_IMAGE=$KEYCLOAK_CUSTOMIZATIONS_IMAGE
+FORMS_FLOW_WEB_IMAGE=$FORMS_FLOW_WEB_IMAGE
+FORMS_FLOW_BPM_IMAGE=$FORMS_FLOW_BPM_IMAGE
+FORMS_FLOW_WEBAPI_IMAGE=$FORMS_FLOW_WEBAPI_IMAGE
+FORMS_FLOW_DOCUMENTS_API_IMAGE=$FORMS_FLOW_DOCUMENTS_API_IMAGE
+DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
+FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=$FORMS_FLOW_DATA_ANALYSIS_API_IMAGE
+DATA_ANALYSIS_API_TAG=$DATA_ANALYSIS_API_TAG
 
-# Function to start forms-flow-bpm
-forms_flow_bpm() {
-    FORMSFLOW_API_URL="http://$ip_add:5001"
-    WEBSOCKET_SECURITY_ORIGIN="http://$ip_add:3000"
-    SESSION_COOKIE_SECURE="false"
-    KEYCLOAK_WEB_CLIENTID="forms-flow-web"
-    REDIS_URL="redis://$ip_add:6379/0"
-    KEYCLOAK_URL_HTTP_RELATIVE_PATH="/auth"
-    FORMSFLOW_DOC_API_URL="http://$ip_add:5006"
-    DATA_ANALYSIS_URL="http://$ip_add:6001"
-    USER_NAME_DISPLAY_CLAIM="preferred_username"
+# Database Configuration
+KEYCLOAK_JDBC_DB=keycloak
+KEYCLOAK_JDBC_USER=admin
+KEYCLOAK_JDBC_PASSWORD=changeme
+FORMIO_DB_USERNAME=admin
+FORMIO_DB_PASSWORD=changeme
+FORMIO_DB_NAME=formio
+CAMUNDA_JDBC_USER=admin
+CAMUNDA_JDBC_PASSWORD=changeme
+CAMUNDA_JDBC_DB_NAME=formsflow-bpm
+FORMSFLOW_API_DB_USER=postgres
+FORMSFLOW_API_DB_PASSWORD=changeme
+FORMSFLOW_API_DB_NAME=webapi
+DATA_ANALYSIS_DB_USER=general
+DATA_ANALYSIS_DB_PASSWORD=changeme
+DATA_ANALYSIS_DB_NAME=dataanalysis
 
+# Keycloak Configuration
+KEYCLOAK_ADMIN_USER=admin
+KEYCLOAK_ADMIN_PASSWORD=changeme
+KEYCLOAK_URL=http://$ip_add:8080
+KEYCLOAK_URL_REALM=forms-flow-ai
+KEYCLOAK_URL_HTTP_RELATIVE_PATH=/auth
+KEYCLOAK_BPM_CLIENT_ID=forms-flow-bpm
+KEYCLOAK_BPM_CLIENT_SECRET=e4bdbd25-1467-4f7f-b993-bc4b1944c943
+KEYCLOAK_WEB_CLIENT_ID=forms-flow-web
+KEYCLOAK_ENABLE_CLIENT_AUTH=false
 
+# API URLs
+FORMIO_DEFAULT_PROJECT_URL=http://$ip_add:3001
+FORMSFLOW_API_URL=http://$ip_add:5001
+BPM_API_URL=http://$ip_add:8000/camunda
+DOCUMENT_SERVICE_URL=http://$ip_add:5006
+DATA_ANALYSIS_URL=http://$ip_add:6001
+DATA_ANALYSIS_API_BASE_URL=http://$ip_add:6001
 
-    echo "FORMSFLOW_API_URL=$FORMSFLOW_API_URL" >> "$1/.env"
-    echo "WEBSOCKET_SECURITY_ORIGIN=$WEBSOCKET_SECURITY_ORIGIN" >> "$1/.env"
-    echo "SESSION_COOKIE_SECURE=$SESSION_COOKIE_SECURE" >> "$1/.env"
-    echo "KEYCLOAK_WEB_CLIENTID=$KEYCLOAK_WEB_CLIENTID" >> "$1/.env"
-    echo "REDIS_URL=$REDIS_URL" >> "$1/.env"
-    echo "FORMSFLOW_DOC_API_URL=$FORMSFLOW_DOC_API_URL" >> "$1/.env"
-    echo "KEYCLOAK_URL_HTTP_RELATIVE_PATH=$KEYCLOAK_URL_HTTP_RELATIVE_PATH" >> "$1/.env"
-    echo "DATA_ANALYSIS_URL=$DATA_ANALYSIS_URL" >> "$1/.env"
-    echo "USER_NAME_DISPLAY_CLAIM=$USER_NAME_DISPLAY_CLAIM" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-bpm
-    sleep 6
-}
+# Application Configuration
+APPLICATION_NAME=formsflow.ai
+LANGUAGE=en
+NODE_ENV=production
 
-# Function to start forms-flow-analytics
-forms_flow_analytics() {
+# Security
+WEBSOCKET_ENCRYPT_KEY=giert989jkwrgb@DR55
+FORMIO_JWT_SECRET=---- change me now ---
+FORM_EMBED_JWT_SECRET=f6a69a42-7f8a-11ed-a1eb-0242ac120002
+
+# Redis
+REDIS_ENABLED=false
+REDIS_URL=redis://redis:6379/0
+
+# Feature Flags
+MULTI_TENANCY_ENABLED=false
+CUSTOM_SUBMISSION_ENABLED=false
+DRAFT_ENABLED=false
+EXPORT_PDF_ENABLED=false
+PUBLIC_WORKFLOW_ENABLED=false
+ENABLE_FORMS_MODULE=true
+ENABLE_TASKS_MODULE=true
+ENABLE_DASHBOARDS_MODULE=true
+ENABLE_PROCESSES_MODULE=true
+ENABLE_APPLICATIONS_MODULE=true
+ENABLE_APPLICATIONS_ACCESS_PERMISSION_CHECK=false
+
+# Formio Configuration
+FORMIO_ROOT_EMAIL=admin@example.com
+FORMIO_ROOT_PASSWORD=changeme
+NO_INSTALL=1
+
+# Camunda Configuration
+CAMUNDA_JDBC_URL=jdbc:postgresql://forms-flow-bpm-db:5432/formsflow-bpm
+CAMUNDA_JDBC_DRIVER=org.postgresql.Driver
+CAMUNDA_APP_ROOT_LOG_FLAG=error
+
+# Database Connection Strings
+FORMSFLOW_API_DB_URL=postgresql://postgres:changeme@forms-flow-webapi-db:5432/webapi
+FORMSFLOW_API_DB_HOST=forms-flow-webapi-db
+FORMSFLOW_API_DB_PORT=5432
+
+# Additional Configuration
+APP_SECURITY_ORIGIN=*
+FORMSFLOW_API_CORS_ORIGINS=*
+CONFIGURE_LOGS=true
+API_LOG_ROTATION_WHEN=d
+API_LOG_ROTATION_INTERVAL=1
+API_LOG_BACKUP_COUNT=7
+DATE_FORMAT=DD-MM-YY
+TIME_FORMAT=hh:mm:ss A
+USER_NAME_DISPLAY_CLAIM=preferred_username
+ENABLE_COMPACT_FORM_VIEW=false
+
+# Worker Configuration
+GUNICORN_WORKERS=5
+GUNICORN_THREADS=10
+GUNICORN_TIMEOUT=120
+FORMSFLOW_DATA_LAYER_WORKERS=4
+EOF
+
+echo ".env file created successfully!"
+echo ""
+
+# --- Function to configure Redash ---
+configure_redash() {
+    echo "***********************************************"
+    echo "*     Configuring Analytics (Redash)...       *"
+    echo "***********************************************"
+    
     REDASH_HOST="http://$ip_add:7001"
     PYTHONUNBUFFERED="0"
     REDASH_LOG_LEVEL="INFO"
@@ -186,149 +412,135 @@ forms_flow_analytics() {
     REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN="*"
     REDASH_REFERRER_POLICY="no-referrer-when-downgrade"
     REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS="Content-Type, Authorization"
-    echo "REDASH_HOST=$REDASH_HOST" >> "$1/.env"
-    echo "PYTHONUNBUFFERED=$PYTHONUNBUFFERED" >> "$1/.env"
-    echo "REDASH_LOG_LEVEL=$REDASH_LOG_LEVEL" >> "$1/.env"
-    echo "REDASH_REDIS_URL=$REDASH_REDIS_URL" >> "$1/.env"
-    echo "POSTGRES_USER=$POSTGRES_USER" >> "$1/.env"
-    echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> "$1/.env"
-    echo "POSTGRES_DB=$POSTGRES_DB" >> "$1/.env"
-    echo "REDASH_COOKIE_SECRET=$REDASH_COOKIE_SECRET" >> "$1/.env"
-    echo "REDASH_SECRET_KEY=$REDASH_SECRET_KEY" >> "$1/.env"
-    echo "REDASH_DATABASE_URL=$REDASH_DATABASE_URL" >> "$1/.env"
-    echo "REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=$REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN" >> "$1/.env"
-    echo "REDASH_REFERRER_POLICY=$REDASH_REFERRER_POLICY" >> "$1/.env"
-    echo "REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=$REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/analytics-docker-compose.yml" run --rm server create_db
-    $compose_cmd -p formsflow-ai -f "$1/analytics-docker-compose.yml" up --build -d
-    sleep 5
-}
+    
+    echo "Configuring Redash..."
+    
+    cat >> "$DOCKER_COMPOSE_DIR/.env" << EOF
 
-# Function to start forms-flow-webapi
-forms_flow_api() {
-    WEB_BASE_URL="http://$ip_add:3000"
-    FORMSFLOW_ADMIN_URL="http://$ip_add:5010/api/v1"
-    if [ "$2" == "1" ]; then
-        echo "Analytics is included in the installation."
-        read -p "What is your Redash API key? " INSIGHT_API_KEY
-        INSIGHT_API_URL="http://$ip_add:7001"
-        echo "INSIGHT_API_URL=$INSIGHT_API_URL" >> "$1/.env"
-        echo "INSIGHT_API_KEY=$INSIGHT_API_KEY" >> "$1/.env"
+# Redash Analytics Configuration
+REDASH_HOST=$REDASH_HOST
+PYTHONUNBUFFERED=$PYTHONUNBUFFERED
+REDASH_LOG_LEVEL=$REDASH_LOG_LEVEL
+REDASH_REDIS_URL=$REDASH_REDIS_URL
+POSTGRES_USER=$POSTGRES_USER
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_DB=$POSTGRES_DB
+REDASH_COOKIE_SECRET=$REDASH_COOKIE_SECRET
+REDASH_SECRET_KEY=$REDASH_SECRET_KEY
+REDASH_DATABASE_URL=$REDASH_DATABASE_URL
+REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN=$REDASH_CORS_ACCESS_CONTROL_ALLOW_ORIGIN
+REDASH_REFERRER_POLICY=$REDASH_REFERRER_POLICY
+REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS=$REDASH_CORS_ACCESS_CONTROL_ALLOW_HEADERS
+EOF
+    
+    echo "Redash configuration complete."
+    echo ""
+    
+    echo "***********************************************"
+    echo "*     Creating Analytics Database...           *"
+    echo "***********************************************"
+    echo "Creating analytics database..."
+    $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" run --rm server create_db || echo "WARNING: Database creation may have failed, but continuing..."
+    
+    echo "***********************************************"
+    echo "*        Starting Analytics Containers...      *"
+    echo "***********************************************"
+    $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" up -d
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to start analytics containers."
+        echo "Please check the logs with: docker logs redash"
+        return 1
     fi
-    echo "WEB_BASE_URL=$WEB_BASE_URL" >> "$1/.env"
-    echo "FORMSFLOW_ADMIN_URL=$FORMSFLOW_ADMIN_URL" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-webapi
+    
+    echo "Waiting for Analytics (Redash) to initialize..."
+    sleep 15
+    
+    echo ""
+    echo "============================================"
+    echo "Redash is now running at: http://$ip_add:7001"
+    echo "============================================"
+    echo ""
+    echo "IMPORTANT: To complete Redash setup:"
+    echo "1. Open http://$ip_add:7001 in your browser"
+    echo "2. Create an admin account"
+    echo "3. Go to Settings -> API Key to generate an API key"
+    echo "4. Copy the API key for the next step"
+    echo ""
+    
+    echo "INSIGHT_API_URL=http://$ip_add:7001" >> "$DOCKER_COMPOSE_DIR/.env"
+    
+    read -p "Enter your Redash API key: " INSIGHT_API_KEY
+    echo "INSIGHT_API_KEY=$INSIGHT_API_KEY" >> "$DOCKER_COMPOSE_DIR/.env"
+    echo "API key saved to .env file."
+    
+    return 0
 }
 
-# Function to start forms-flow-documents-api
-forms_flow_documents() {
-    DOCUMENT_SERVICE_URL="http://$ip_add:5006"
-    echo "DOCUMENT_SERVICE_URL=$DOCUMENT_SERVICE_URL" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-documents-api
-    sleep 5
-}
-forms_flow_data_layer() {
-    DEBUG=false
-    FORMSFLOW_DATA_LAYER_WORKERS=4
-    FORMSFLOW_DATALAYER_CORS_ORIGINS=*
-    KEYCLOAK_ENABLE_CLIENT_AUTH=false
-    KEYCLOAK_URL_REALM=forms-flow-ai
-    JWT_OIDC_JWKS_URI=http://$ip_add:8080/auth/realms/forms-flow-ai/protocol/openid-connect/certs
-    JWT_OIDC_ISSUER=http://$ip_add:8080/auth/realms/forms-flow-ai
-    JWT_OIDC_AUDIENCE=forms-flow-web
-    JWT_OIDC_CACHING_ENABLED=True
-    FORMSFLOW_API_DB_URL=postgresql://postgres:changeme@$ip_add:6432/webapi
-    FORMSFLOW_API_DB_HOST=$ip_add
-    FORMSFLOW_API_DB_PORT=6432
-    FORMSFLOW_API_DB_USER=postgres
-    FORMSFLOW_API_DB_PASSWORD=changeme
-    FORMSFLOW_API_DB_NAME=webapi
-    FORMIO_DB_HOST=$ip_add
-    FORMIO_DB_PORT=27018
-    FORMIO_DB_USERNAME=admin
-    FORMIO_DB_PASSWORD=changeme
-    FORMIO_DB_NAME=formio
-    FORMIO_DB_URI="mongodb://admin:changeme@$ip_add:27018/formio?authMechanism=SCRAM-SHA-1&authSource=admin"
-    CAMUNDA_DB_URL=jdbc:postgresql://admin:changeme@$ip_add:5432/formsflow-bpm
-    CAMUNDA_DB_USER=admin
-    CAMUNDA_DB_PASSWORD=changeme
-    CAMUNDA_DB_HOST=$ip_add
-    CAMUNDA_DB_PORT=5432
-    CAMUNDA_DB_NAME=formsflow-bpm
+# --- Start Keycloak first ---
+echo "***********************************************"
+echo "*        Starting Keycloak container...        *"
+echo "***********************************************"
+$COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to start Keycloak."
+    exit 1
+fi
+echo "Waiting for Keycloak to initialize..."
+sleep 25
+echo "Keycloak is up."
+echo ""
 
-    echo "DEBUG=$DEBUG" >> "$1/.env"
-    echo "FORMSFLOW_DATA_LAYER_WORKERS=$FORMSFLOW_DATA_LAYER_WORKERS" >> "$1/.env"
-    echo "FORMSFLOW_DATALAYER_CORS_ORIGINS=$FORMSFLOW_DATALAYER_CORS_ORIGINS" >> "$1/.env"
-    echo "KEYCLOAK_ENABLE_CLIENT_AUTH=$KEYCLOAK_ENABLE_CLIENT_AUTH" >> "$1/.env"
-    echo "KEYCLOAK_URL_REALM=$KEYCLOAK_URL_REALM" >> "$1/.env"
-    echo "JWT_OIDC_JWKS_URI=$JWT_OIDC_JWKS_URI" >> "$1/.env"
-    echo "JWT_OIDC_ISSUER=$JWT_OIDC_ISSUER" >> "$1/.env"
-    echo "JWT_OIDC_AUDIENCE=$JWT_OIDC_AUDIENCE" >> "$1/.env"
-    echo "JWT_OIDC_CACHING_ENABLED=$JWT_OIDC_CACHING_ENABLED" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_URL=$FORMSFLOW_API_DB_URL" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_HOST=$FORMSFLOW_API_DB_HOST" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_PORT=$FORMSFLOW_API_DB_PORT" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_USER=$FORMSFLOW_API_DB_USER" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_PASSWORD=$FORMSFLOW_API_DB_PASSWORD" >> "$1/.env"
-    echo "FORMSFLOW_API_DB_NAME=$FORMSFLOW_API_DB_NAME" >> "$1/.env"
-    echo "FORMIO_DB_URI=$FORMIO_DB_URI" >> "$1/.env"
-    echo "FORMIO_DB_HOST=$FORMIO_DB_HOST" >> "$1/.env"
-    echo "FORMIO_DB_PORT=$FORMIO_DB_PORT" >> "$1/.env"
-    echo "FORMIO_DB_USERNAME=$FORMIO_DB_USERNAME" >> "$1/.env"
-    echo "FORMIO_DB_PASSWORD=$FORMIO_DB_PASSWORD" >> "$1/.env"
-    echo "FORMIO_DB_NAME=$FORMIO_DB_NAME" >> "$1/.env"
-    echo "FORMIO_DB_OPTIONS=$FORMIO_DB_OPTIONS" >> "$1/.env"
-    echo "CAMUNDA_DB_URL=$CAMUNDA_DB_URL" >> "$1/.env"
-    echo "CAMUNDA_DB_USER=$CAMUNDA_DB_USER" >> "$1/.env"
-    echo "CAMUNDA_DB_PASSWORD=$CAMUNDA_DB_PASSWORD" >> "$1/.env"
-    echo "CAMUNDA_DB_HOST=$CAMUNDA_DB_HOST" >> "$1/.env"
-    echo "CAMUNDA_DB_PORT=$CAMUNDA_DB_PORT" >> "$1/.env"
-    echo "CAMUNDA_DB_NAME=$CAMUNDA_DB_NAME" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-data-layer
-    sleep 5
-}
-
-# Function to start forms-flow-data-analysis-api
-forms_flow_data_analysis() {
-    DATA_ANALYSIS_API_BASE_URL="http://$ip_add:6001"
-    DATA_ANALYSIS_DB_URL="postgresql://general:changeme@forms-flow-data-analysis-db:5432/dataanalysis"
-    echo "DATA_ANALYSIS_API_BASE_URL=$DATA_ANALYSIS_API_BASE_URL" >> "$1/.env"
-    echo "DATA_ANALYSIS_DB_URL=$DATA_ANALYSIS_DB_URL" >> "$1/.env"
-    $compose_cmd -p formsflow-ai -f "$1/$docker_compose_file" up --build -d forms-flow-data-analysis-api
-    sleep 5
-}
-
-# Main function
-main() {
-    set_common_properties
-    set_docker_compose_file
-    set_compose_command
-    fetch_valid_versions
-    check_valid_version
-    find_my_ip
-    prompt_question
-    keycloak "$1"
-    forms_flow_forms "$1"
-    forms_flow_bpm "$1"
-    if [ "$analytics" -eq 1 ]; then
-        forms_flow_analytics "$1"
+# --- Start Analytics (if selected) ---
+if [ "$analytics" == "1" ]; then
+    if [ -n "$ANALYTICS_COMPOSE_FILE" ]; then
+        configure_redash
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to configure or start analytics."
+            exit 1
+        fi
+    else
+        echo "WARNING: analytics compose file not found; skipping analytics setup."
     fi
-    forms_flow_api "$1" "$analytics"
-    forms_flow_data_layer "$1"
-    forms_flow_documents "$1"
-    forms_flow_web "$1"
-    if [ "$forms_flow_data_analysis" -eq 1 ]; then
-        forms_flow_data_analysis "$1"
-    fi
-    isUp
-    echo "********************** formsflow.ai is successfully installed ****************************"
-    exit 0
-}
+fi
 
-# Check if Docker is installed and running
-if ! command -v docker &> /dev/null; then
-    echo "Docker is not installed or not running. Please install and start Docker before running this script."
+# --- Start Main Stack ---
+echo "***********************************************"
+echo "*       Starting Main FormsFlow Stack...       *"
+echo "***********************************************"
+
+if [ "$dataanalysis" == "1" ]; then
+    echo "Starting all services including Data Analysis API..."
+    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d
+else
+    echo "Starting core services (excluding Data Analysis API)..."
+    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web redis
+fi
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to start main containers."
     exit 1
 fi
 
-main "."
+echo ""
+echo "============================================"
+echo "formsflow.ai installation completed successfully!"
+echo "============================================"
+echo ""
+echo "Access points:"
+echo "  - FormsFlow Web: http://$ip_add:3000"
+echo "  - Keycloak:      http://$ip_add:8080/auth"
+echo "  - API:           http://$ip_add:5001"
+echo "  - BPM:           http://$ip_add:8000"
+if [ "$dataanalysis" == "1" ]; then
+    echo "  - Data Analysis: http://$ip_add:6001"
+fi
+if [ "$analytics" == "1" ]; then
+    echo "  - Analytics:     http://$ip_add:7001"
+fi
+echo ""
+echo "Default credentials:"
+echo "  - Username: admin"
+echo "  - Password: changeme"
+echo ""
+echo "Edition installed: $EDITION ($ARCH)"
+echo ""
