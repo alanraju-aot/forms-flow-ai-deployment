@@ -247,6 +247,7 @@ echo "- IP Address: $ip_add"
 echo "- Edition: $EDITION"
 echo "- Architecture: $ARCH"
 echo "- PLATFORM: $PLATFORM"
+echo "- Documents API Tag: $DOCUMENTS_API_TAG"
 echo "- Analytics: $analytics"
 echo "- Data Analysis: $dataanalysis"
 echo "============================================"
@@ -273,6 +274,9 @@ PLATFORM=$PLATFORM
 
 # Edition
 EDITION=$EDITION
+
+# Image Tags
+DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
 
 # Database Configuration
 KEYCLOAK_JDBC_DB=keycloak
@@ -569,6 +573,7 @@ echo "  - Username: admin"
 echo "  - Password: changeme"
 echo ""
 echo "Edition installed: $EDITION ($ARCH)"
+echo "Documents API: $DOCUMENTS_API_TAG"
 echo ""
 
 if [ "$ARCH" == "arm64" ] && [ "$analytics" == "0" ]; then
