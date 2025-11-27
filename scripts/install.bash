@@ -160,10 +160,29 @@ if [ -z "$COMPOSE_FILE" ]; then
 fi
 
 # --- Analytics & Data Analysis selections ---
+# Check if ARM64 and warn about analytics compatibility
+if [ "$ARCH" == "arm64" ]; then
+    echo "WARNING: You are running on ARM64 architecture."
+    echo "Analytics (Redash) may not have ARM64 support and could fail to start."
+    echo ""
+fi
+
 read -p "Do you want to include analytics in the installation? [y/n] " includeAnalytics
 if [[ "$includeAnalytics" =~ ^[Yy]$ ]]; then
     analytics=1
     echo "Analytics will be included."
+    
+    # Additional warning for ARM64
+    if [ "$ARCH" == "arm64" ]; then
+        echo ""
+        echo "NOTE: Analytics containers may fail on ARM64. If installation fails,"
+        echo "you can re-run without analytics or use Rosetta/emulation if available."
+        read -p "Continue with analytics? [y/n] " continueAnalytics
+        if [[ ! "$continueAnalytics" =~ ^[Yy]$ ]]; then
+            analytics=0
+            echo "Analytics will be skipped."
+        fi
+    fi
 else
     analytics=0
     echo "Analytics will not be included."
@@ -204,66 +223,13 @@ echo "- Analytics: $analytics"
 echo "- Data Analysis: $dataanalysis"
 echo "============================================"
 echo ""
+echo "NOTE: Image versions are configured in docker-compose.yml"
+echo ""
 read -p "Begin installation with these settings? [y/n] " confirmInstall
 if [[ ! "$confirmInstall" =~ ^[Yy]$ ]]; then
     echo "Installation cancelled."
     exit 0
 fi
-
-# --- Set version ---
-FORMSFLOW_VERSION="v7.3.0"
-
-# --- Configure image names based on edition and architecture ---
-echo ""
-echo "Configuring images for Edition: $EDITION, Architecture: $ARCH"
-
-# Set base image names according to edition
-if [ "$EDITION" == "ee" ]; then
-    echo "Applying Enterprise Edition configuration..."
-    KEYCLOAK_CUSTOMIZATIONS_IMAGE="formsflow/keycloak-customizations-ee"
-    FORMS_FLOW_WEB_IMAGE="formsflow/forms-flow-web-ee"
-    FORMS_FLOW_BPM_IMAGE="formsflow/forms-flow-bpm-ee"
-    FORMS_FLOW_WEBAPI_IMAGE="formsflow/forms-flow-webapi-ee"
-    FORMS_FLOW_DOCUMENTS_API_IMAGE="formsflow/forms-flow-documents-api-ee"
-    FORMS_FLOW_DATA_ANALYSIS_API_IMAGE="formsflow/forms-flow-data-analysis-api-ee"
-else
-    echo "Applying Community Edition configuration..."
-    KEYCLOAK_CUSTOMIZATIONS_IMAGE="formsflow/keycloak-customizations"
-    FORMS_FLOW_WEB_IMAGE="formsflow/forms-flow-web"
-    FORMS_FLOW_BPM_IMAGE="formsflow/forms-flow-bpm"
-    FORMS_FLOW_WEBAPI_IMAGE="formsflow/forms-flow-webapi"
-    FORMS_FLOW_DOCUMENTS_API_IMAGE="formsflow/forms-flow-documents-api"
-    FORMS_FLOW_DATA_ANALYSIS_API_IMAGE="formsflow/forms-flow-data-analysis-api"
-fi
-
-# Configure tags based on architecture and edition
-if [ "$ARCH" == "arm64" ]; then
-    echo "Applying ARM64-specific configuration..."
-    DOCUMENTS_API_TAG="$FORMSFLOW_VERSION-arm64"
-    DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION"
-else
-    echo "Applying AMD64-specific configuration..."
-    DOCUMENTS_API_TAG="$FORMSFLOW_VERSION"
-    if [ "$EDITION" == "ee" ]; then
-        DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION-trim"
-    else
-        DATA_ANALYSIS_API_TAG="$FORMSFLOW_VERSION"
-    fi
-fi
-
-# Display final image configuration
-echo ""
-echo "============================================"
-echo "Final Image Configuration:"
-echo "============================================"
-echo "KEYCLOAK_CUSTOMIZATIONS_IMAGE=$KEYCLOAK_CUSTOMIZATIONS_IMAGE:$FORMSFLOW_VERSION"
-echo "FORMS_FLOW_WEB_IMAGE=$FORMS_FLOW_WEB_IMAGE:$FORMSFLOW_VERSION"
-echo "FORMS_FLOW_BPM_IMAGE=$FORMS_FLOW_BPM_IMAGE:$FORMSFLOW_VERSION"
-echo "FORMS_FLOW_WEBAPI_IMAGE=$FORMS_FLOW_WEBAPI_IMAGE:$FORMSFLOW_VERSION"
-echo "FORMS_FLOW_DOCUMENTS_API_IMAGE=$FORMS_FLOW_DOCUMENTS_API_IMAGE:$DOCUMENTS_API_TAG"
-echo "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=$FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:$DATA_ANALYSIS_API_TAG"
-echo "============================================"
-echo ""
 
 # --- Create .env file ---
 echo "Creating .env file..."
@@ -273,25 +239,12 @@ cat > "$DOCKER_COMPOSE_DIR/.env" << EOF
 # Architecture: $ARCH
 # Edition: $EDITION
 
-# Version
-FORMSFLOW_VERSION=$FORMSFLOW_VERSION
-
 # Architecture and Platform
 ARCHITECTURE=$ARCH
 PLATFORM=$PLATFORM
 
 # Edition
 EDITION=$EDITION
-
-# Image Names
-KEYCLOAK_CUSTOMIZATIONS_IMAGE=$KEYCLOAK_CUSTOMIZATIONS_IMAGE
-FORMS_FLOW_WEB_IMAGE=$FORMS_FLOW_WEB_IMAGE
-FORMS_FLOW_BPM_IMAGE=$FORMS_FLOW_BPM_IMAGE
-FORMS_FLOW_WEBAPI_IMAGE=$FORMS_FLOW_WEBAPI_IMAGE
-FORMS_FLOW_DOCUMENTS_API_IMAGE=$FORMS_FLOW_DOCUMENTS_API_IMAGE
-DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
-FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=$FORMS_FLOW_DATA_ANALYSIS_API_IMAGE
-DATA_ANALYSIS_API_TAG=$DATA_ANALYSIS_API_TAG
 
 # Database Configuration
 KEYCLOAK_JDBC_DB=keycloak
@@ -399,6 +352,14 @@ configure_redash() {
     echo "*     Configuring Analytics (Redash)...       *"
     echo "***********************************************"
     
+    # Check if running on ARM64
+    if [ "$ARCH" == "arm64" ]; then
+        echo ""
+        echo "WARNING: Attempting to start Analytics on ARM64 architecture."
+        echo "This may fail if Redash images don't support ARM64."
+        echo ""
+    fi
+    
     REDASH_HOST="http://$ip_add:7001"
     PYTHONUNBUFFERED="0"
     REDASH_LOG_LEVEL="INFO"
@@ -440,16 +401,50 @@ EOF
     echo "*     Creating Analytics Database...           *"
     echo "***********************************************"
     echo "Creating analytics database..."
-    $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" run --rm server create_db || echo "WARNING: Database creation may have failed, but continuing..."
+    
+    # Try to create database, but don't fail if it errors on ARM64
+    if ! $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" run --rm server create_db 2>&1; then
+        echo "WARNING: Database creation failed."
+        if [ "$ARCH" == "arm64" ]; then
+            echo "This is likely due to ARM64 incompatibility with Redash images."
+            read -p "Do you want to continue without analytics? [y/n] " skipAnalytics
+            if [[ "$skipAnalytics" =~ ^[Yy]$ ]]; then
+                return 1
+            else
+                echo "Installation will be aborted."
+                exit 1
+            fi
+        fi
+    fi
     
     echo "***********************************************"
     echo "*        Starting Analytics Containers...      *"
     echo "***********************************************"
-    $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" up -d
-    if [ $? -ne 0 ]; then
+    
+    # Try to start analytics, but handle ARM64 failure gracefully
+    if ! $COMPOSE_COMMAND -p formsflow-ai -f "$ANALYTICS_COMPOSE_FILE" up -d 2>&1; then
         echo "ERROR: Failed to start analytics containers."
-        echo "Please check the logs with: docker logs redash"
-        return 1
+        
+        if [ "$ARCH" == "arm64" ]; then
+            echo ""
+            echo "NOTICE: Analytics failed to start on ARM64 architecture."
+            echo "This is expected as Redash may not have ARM64 support."
+            echo ""
+            echo "Options:"
+            echo "1. Continue installation without analytics"
+            echo "2. Use Docker Desktop with Rosetta emulation (Mac only)"
+            echo "3. Run on AMD64 architecture"
+            echo ""
+            read -p "Continue without analytics? [y/n] " continueWithout
+            if [[ "$continueWithout" =~ ^[Yy]$ ]]; then
+                return 1
+            else
+                exit 1
+            fi
+        else
+            echo "Please check the logs with: docker logs redash"
+            return 1
+        fi
     fi
     
     echo "Waiting for Analytics (Redash) to initialize..."
@@ -495,11 +490,14 @@ if [ "$analytics" == "1" ]; then
     if [ -n "$ANALYTICS_COMPOSE_FILE" ]; then
         configure_redash
         if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to configure or start analytics."
-            exit 1
+            echo ""
+            echo "WARNING: Analytics setup was skipped or failed."
+            echo "Continuing with main installation..."
+            analytics=0
         fi
     else
         echo "WARNING: analytics compose file not found; skipping analytics setup."
+        analytics=0
     fi
 fi
 
@@ -544,3 +542,10 @@ echo "  - Password: changeme"
 echo ""
 echo "Edition installed: $EDITION ($ARCH)"
 echo ""
+
+if [ "$ARCH" == "arm64" ] && [ "$analytics" == "0" ]; then
+    echo "NOTE: Analytics was skipped due to ARM64 compatibility issues."
+    echo "To use analytics, consider running on AMD64 architecture or using"
+    echo "Docker Desktop with Rosetta 2 emulation (Mac M-series only)."
+    echo ""
+fi

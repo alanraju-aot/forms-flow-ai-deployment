@@ -42,7 +42,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: ${KEYCLOAK_CUSTOMIZATIONS_IMAGE:-formsflow/keycloak-customizations}:${FORMSFLOW_VERSION:-v7.3.0}
+    image: ${KEYCLOAK_CUSTOMIZATIONS_IMAGE:-formsflow/keycloak-customizations}:v8.0.0-alpha
     restart: always
     tty: true
     stdin_open: true  
@@ -69,7 +69,7 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: ${FORMS_FLOW_WEB_IMAGE:-formsflow/forms-flow-web}:${FORMSFLOW_VERSION:-v7.3.0}
+    image: ${FORMS_FLOW_WEB_IMAGE:-formsflow/forms-flow-web}:v8.0.0-alpha
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
@@ -125,7 +125,7 @@ services:
       - formsflow
 
   forms-flow-forms:
-    image: formsflow/forms-flow-forms:${FORMSFLOW_VERSION:-v7.3.0}
+    image: formsflow/forms-flow-forms:v7.3.0
     restart: always
     environment:
       DEBUG: formio:*
@@ -156,7 +156,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: ${FORMS_FLOW_BPM_IMAGE:-formsflow/forms-flow-bpm}:${FORMSFLOW_VERSION:-v7.3.0}
+    image: ${FORMS_FLOW_BPM_IMAGE:-formsflow/forms-flow-bpm}:v8.0.0-alpha
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -234,7 +234,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: ${FORMS_FLOW_WEBAPI_IMAGE:-formsflow/forms-flow-webapi}:${FORMSFLOW_VERSION:-v7.3.0}
+    image: ${FORMS_FLOW_WEBAPI_IMAGE:-formsflow/forms-flow-webapi}:v8.0.0-alpha
     restart: always
     links:
       - forms-flow-webapi-db
@@ -300,7 +300,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v7.3.0}
+    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:v8.0.0-alpha
     restart: always
     links:
       - forms-flow-forms
@@ -353,7 +353,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: ${FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:-formsflow/forms-flow-data-analysis-api}:${DATA_ANALYSIS_API_TAG:-v7.3.0}
+    image: ${FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:-formsflow/forms-flow-data-analysis-api}:v8.0.0-alpha
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -379,7 +379,7 @@ services:
       - formsflow
 
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:${FORMSFLOW_VERSION:-v7.3.0}
+    image: formsflow/forms-flow-data-layer:v8.0.0-alpha
     container_name: forms-flow-data-layer
     restart: always
     ports:

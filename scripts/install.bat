@@ -215,75 +215,14 @@ echo - Analytics: !analytics!
 echo - Data Analysis: !dataanalysis!
 echo ============================================
 echo.
+echo NOTE: Image versions are configured in docker-compose.yml
+echo.
 set /p "confirmInstall=Begin installation with these settings? [y/n] "
 if /i "!confirmInstall!" neq "y" (
     echo Installation cancelled.
     pause
     exit /b 0
 )
-
-REM --- Set version ---
-set "FORMSFLOW_VERSION=v7.3.0"
-
-REM --- Configure image names based on edition and architecture ---
-REM According to the documentation:
-REM - CE images: formsflow/service-name
-REM - EE images: formsflow/service-name-ee
-REM - Documents API has architecture-specific tags
-REM - Data Analysis API (EE AMD64 only) uses -trim tag
-
-echo.
-echo Configuring images for Edition: !EDITION!, Architecture: !ARCH!
-
-REM Set base image names according to edition
-if "!EDITION!"=="ee" (
-    echo Applying Enterprise Edition configuration...
-    set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=formsflow/keycloak-customizations-ee"
-    set "FORMS_FLOW_WEB_IMAGE=formsflow/forms-flow-web-ee"
-    set "FORMS_FLOW_BPM_IMAGE=formsflow/forms-flow-bpm-ee"
-    set "FORMS_FLOW_WEBAPI_IMAGE=formsflow/forms-flow-webapi-ee"
-    set "FORMS_FLOW_DOCUMENTS_API_IMAGE=formsflow/forms-flow-documents-api-ee"
-    set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=formsflow/forms-flow-data-analysis-api-ee"
-) else (
-    echo Applying Community Edition configuration...
-    set "KEYCLOAK_CUSTOMIZATIONS_IMAGE=formsflow/keycloak-customizations"
-    set "FORMS_FLOW_WEB_IMAGE=formsflow/forms-flow-web"
-    set "FORMS_FLOW_BPM_IMAGE=formsflow/forms-flow-bpm"
-    set "FORMS_FLOW_WEBAPI_IMAGE=formsflow/forms-flow-webapi"
-    set "FORMS_FLOW_DOCUMENTS_API_IMAGE=formsflow/forms-flow-documents-api"
-    set "FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=formsflow/forms-flow-data-analysis-api"
-)
-
-REM Configure tags based on architecture and edition
-REM Documents API: Only service with architecture-specific images
-if "!ARCH!"=="arm64" (
-    echo Applying ARM64-specific configuration...
-    set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!-arm64"
-    set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!"
-) else (
-    echo Applying AMD64-specific configuration...
-    set "DOCUMENTS_API_TAG=!FORMSFLOW_VERSION!"
-    REM Data Analysis API: EE on AMD64 uses -trim tag
-    if "!EDITION!"=="ee" (
-        set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!-trim"
-    ) else (
-        set "DATA_ANALYSIS_API_TAG=!FORMSFLOW_VERSION!"
-    )
-)
-
-REM Display final image configuration
-echo.
-echo ============================================
-echo Final Image Configuration:
-echo ============================================
-echo KEYCLOAK_CUSTOMIZATIONS_IMAGE=!KEYCLOAK_CUSTOMIZATIONS_IMAGE!:!FORMSFLOW_VERSION!
-echo FORMS_FLOW_WEB_IMAGE=!FORMS_FLOW_WEB_IMAGE!:!FORMSFLOW_VERSION!
-echo FORMS_FLOW_BPM_IMAGE=!FORMS_FLOW_BPM_IMAGE!:!FORMSFLOW_VERSION!
-echo FORMS_FLOW_WEBAPI_IMAGE=!FORMS_FLOW_WEBAPI_IMAGE!:!FORMSFLOW_VERSION!
-echo FORMS_FLOW_DOCUMENTS_API_IMAGE=!FORMS_FLOW_DOCUMENTS_API_IMAGE!:!DOCUMENTS_API_TAG!
-echo FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=!FORMS_FLOW_DATA_ANALYSIS_API_IMAGE!:!DATA_ANALYSIS_API_TAG!
-echo ============================================
-echo.
 
 REM --- Create .env file ---
 echo Creating .env file...
@@ -293,25 +232,12 @@ echo # Generated on %date% %time%
 echo # Architecture: !ARCH!
 echo # Edition: !EDITION!
 echo.
-echo # Version
-echo FORMSFLOW_VERSION=!FORMSFLOW_VERSION!
-echo.
 echo # Architecture and Platform
 echo ARCHITECTURE=!ARCH!
 echo PLATFORM=!PLATFORM!
 echo.
 echo # Edition
 echo EDITION=!EDITION!
-echo.
-echo # Image Names
-echo KEYCLOAK_CUSTOMIZATIONS_IMAGE=!KEYCLOAK_CUSTOMIZATIONS_IMAGE!
-echo FORMS_FLOW_WEB_IMAGE=!FORMS_FLOW_WEB_IMAGE!
-echo FORMS_FLOW_BPM_IMAGE=!FORMS_FLOW_BPM_IMAGE!
-echo FORMS_FLOW_WEBAPI_IMAGE=!FORMS_FLOW_WEBAPI_IMAGE!
-echo FORMS_FLOW_DOCUMENTS_API_IMAGE=!FORMS_FLOW_DOCUMENTS_API_IMAGE!
-echo DOCUMENTS_API_TAG=!DOCUMENTS_API_TAG!
-echo FORMS_FLOW_DATA_ANALYSIS_API_IMAGE=!FORMS_FLOW_DATA_ANALYSIS_API_IMAGE!
-echo DATA_ANALYSIS_API_TAG=!DATA_ANALYSIS_API_TAG!
 echo.
 echo # Database Configuration
 echo KEYCLOAK_JDBC_DB=keycloak
@@ -418,11 +344,6 @@ echo ***********************************************
 echo *        Starting Keycloak container...        *
 echo ***********************************************
 
-echo .env file created successfully!
-echo.
-echo ***********************************************
-echo *        Starting Keycloak container...        *
-echo ***********************************************
 !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d keycloak keycloak-db keycloak-customizations
 if errorlevel 1 (
     echo ERROR: Failed to start Keycloak.
