@@ -159,6 +159,34 @@ if [ -z "$COMPOSE_FILE" ]; then
     exit 1
 fi
 
+# --- Extract Documents API tag from docker-compose.yml ---
+echo "Reading Documents API version from docker-compose.yml..."
+BASE_DOCUMENTS_API_TAG=""
+
+if [ -f "$COMPOSE_FILE" ]; then
+    # Extract the tag from the forms-flow-documents-api image line
+    # Looking for pattern like: image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
+    BASE_DOCUMENTS_API_TAG=$(grep -A 1 "forms-flow-documents-api:" "$COMPOSE_FILE" | grep "image:" | sed -n 's/.*DOCUMENTS_API_TAG:-\([^}]*\)}.*/\1/p')
+    
+    if [ -z "$BASE_DOCUMENTS_API_TAG" ]; then
+        echo "WARNING: Could not extract Documents API tag from docker-compose.yml"
+        echo "Using default: v8.0.0-alpha"
+        BASE_DOCUMENTS_API_TAG="v8.0.0-alpha"
+    else
+        echo "Found base Documents API tag: $BASE_DOCUMENTS_API_TAG"
+    fi
+fi
+
+# Set the final DOCUMENTS_API_TAG based on architecture
+if [ "$ARCH" == "arm64" ]; then
+    DOCUMENTS_API_TAG="${BASE_DOCUMENTS_API_TAG}-arm64"
+else
+    DOCUMENTS_API_TAG="$BASE_DOCUMENTS_API_TAG"
+fi
+
+echo "Documents API tag will be: $DOCUMENTS_API_TAG"
+echo ""
+
 # --- Analytics & Data Analysis selections ---
 # Check if ARM64 and warn about analytics compatibility
 if [ "$ARCH" == "arm64" ]; then

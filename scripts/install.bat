@@ -171,6 +171,51 @@ if not defined COMPOSE_FILE (
     exit /b 1
 )
 
+REM --- Extract Documents API tag from docker-compose.yml ---
+echo Reading Documents API version from docker-compose.yml...
+set "BASE_DOCUMENTS_API_TAG="
+
+if exist "!COMPOSE_FILE!" (
+    REM Extract the tag from the forms-flow-documents-api image line
+    REM Looking for pattern like: image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
+    for /f "tokens=*" %%i in ('findstr /C:"forms-flow-documents-api" "!COMPOSE_FILE!"') do (
+        set "line=%%i"
+        echo !line! | findstr /C:"image:" >nul
+        if not errorlevel 1 (
+            REM Extract the version tag between DOCUMENTS_API_TAG:- and }
+            for /f "tokens=2 delims=:-" %%a in ("!line!") do (
+                set "temp=%%a"
+                for /f "tokens=1 delims=}" %%b in ("!temp!") do (
+                    set "potential_tag=%%b"
+                    REM Check if it looks like a version tag (starts with v)
+                    echo !potential_tag! | findstr /B "v" >nul
+                    if not errorlevel 1 (
+                        set "BASE_DOCUMENTS_API_TAG=!potential_tag!"
+                    )
+                )
+            )
+        )
+    )
+    
+    if "!BASE_DOCUMENTS_API_TAG!"=="" (
+        echo WARNING: Could not extract Documents API tag from docker-compose.yml
+        echo Using default: v8.0.0-alpha
+        set "BASE_DOCUMENTS_API_TAG=v8.0.0-alpha"
+    ) else (
+        echo Found base Documents API tag: !BASE_DOCUMENTS_API_TAG!
+    )
+)
+
+REM Set the final DOCUMENTS_API_TAG based on architecture
+if "!ARCH!"=="arm64" (
+    set "DOCUMENTS_API_TAG=!BASE_DOCUMENTS_API_TAG!-arm64"
+) else (
+    set "DOCUMENTS_API_TAG=!BASE_DOCUMENTS_API_TAG!"
+)
+
+echo Documents API tag will be: !DOCUMENTS_API_TAG!
+echo.
+
 REM --- Analytics & Data Analysis selections ---
 set /p "includeAnalytics=Do you want to include analytics in the installation? [y/n] "
 if /i "!includeAnalytics!"=="y" (

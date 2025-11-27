@@ -300,7 +300,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:v8.0.0-alpha
+    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
     restart: always
     links:
       - forms-flow-forms
