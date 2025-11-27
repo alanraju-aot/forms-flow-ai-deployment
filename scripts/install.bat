@@ -176,27 +176,23 @@ echo Reading Documents API version from docker-compose.yml...
 set "BASE_DOCUMENTS_API_TAG="
 
 if exist "!COMPOSE_FILE!" (
-    REM Extract the tag from the forms-flow-documents-api image line
-    REM Looking for pattern like: image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
-    for /f "tokens=*" %%i in ('findstr /C:"forms-flow-documents-api" "!COMPOSE_FILE!"') do (
+    set "BASE_DOCUMENTS_API_TAG="
+
+    for /f "usebackq tokens=*" %%i in (`findstr /C:"forms-flow-documents-api" "!COMPOSE_FILE!"`) do (
         set "line=%%i"
-        echo !line! | findstr /C:"image:" >nul
+
+        REM Check if line contains DOCUMENTS_API_TAG:-
+        echo !line! | findstr "DOCUMENTS_API_TAG:-" >nul
         if not errorlevel 1 (
-            REM Extract the version tag between DOCUMENTS_API_TAG:- and }
-            for /f "tokens=2 delims=:-" %%a in ("!line!") do (
-                set "temp=%%a"
-                for /f "tokens=1 delims=}" %%b in ("!temp!") do (
-                    set "potential_tag=%%b"
-                    REM Check if it looks like a version tag (starts with v)
-                    echo !potential_tag! | findstr /B "v" >nul
-                    if not errorlevel 1 (
-                        set "BASE_DOCUMENTS_API_TAG=!potential_tag!"
-                    )
-                )
+            set "temp=!line:*DOCUMENTS_API_TAG:-=!"
+            REM temp now starts with v8.0.0-alpha}
+            
+            for /f "tokens=1 delims=}" %%b in ("!temp!") do (
+                set "BASE_DOCUMENTS_API_TAG=%%b"
             )
         )
     )
-    
+
     if "!BASE_DOCUMENTS_API_TAG!"=="" (
         echo WARNING: Could not extract Documents API tag from docker-compose.yml
         echo Using default: v8.0.0-alpha
