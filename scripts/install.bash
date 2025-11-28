@@ -4,7 +4,7 @@
 # VERSION CONFIGURATION
 # ============================================
 # Modify these tags for testing alpha/beta versions
-CE_VERSION="v7.3.0"
+CE_VERSION="v8.0.0-alpha"
 EE_VERSION="v8.0.0-alpha"  # Change to v8.0.0 for stable release
 FORMS_VERSION="v7.3.0"     # Same for both CE and EE
 

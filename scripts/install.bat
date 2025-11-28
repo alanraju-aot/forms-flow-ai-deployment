@@ -5,7 +5,7 @@ REM ============================================
 REM VERSION CONFIGURATION
 REM ============================================
 REM Modify these tags for testing alpha/beta versions
-set "CE_VERSION=v7.3.0"
+set "CE_VERSION=v8.0.0-alpha"
 set "EE_VERSION=v8.0.0-alpha"
 set "FORMS_VERSION=v7.3.0"
 
