@@ -1,6 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
 
+REM ============================================
+REM VERSION CONFIGURATION
+REM ============================================
+REM Modify these tags for testing alpha/beta versions
+set "CE_VERSION=v7.3.0"
+set "EE_VERSION=v8.0.0-alpha"
+set "FORMS_VERSION=v7.3.0"
+
 echo *******************************************
 echo *     formsflow.ai Installation Script    *
 echo *******************************************
@@ -134,16 +142,20 @@ set /p "editionChoice=Enter your choice [1-2]: "
 REM Properly handle edition selection
 if "!editionChoice!"=="2" (
     set "EDITION=ee"
+    set "IMAGE_TAG=!EE_VERSION!"
     echo.
     echo ============================================
     echo Selected: Premium ^(Enterprise Edition^)
+    echo Version: !EE_VERSION!
     echo ============================================
     echo.
 ) else (
     set "EDITION=ce"
+    set "IMAGE_TAG=!CE_VERSION!"
     echo.
     echo ============================================
     echo Selected: Open Source ^(Community Edition^)
+    echo Version: !CE_VERSION!
     echo ============================================
     echo.
 )
@@ -171,46 +183,12 @@ if not defined COMPOSE_FILE (
     exit /b 1
 )
 
-REM --- Extract Documents API tag from docker-compose.yml ---
-echo Reading Documents API version from docker-compose.yml...
-set "BASE_DOCUMENTS_API_TAG="
-
-if exist "!COMPOSE_FILE!" (
-    set "BASE_DOCUMENTS_API_TAG="
-
-    for /f "usebackq tokens=*" %%i in (`findstr /C:"forms-flow-documents-api" "!COMPOSE_FILE!"`) do (
-        set "line=%%i"
-
-        REM Check if line contains DOCUMENTS_API_TAG:-
-        echo !line! | findstr "DOCUMENTS_API_TAG:-" >nul
-        if not errorlevel 1 (
-            set "temp=!line:*DOCUMENTS_API_TAG:-=!"
-            REM temp now starts with v8.0.0-alpha}
-            
-            for /f "tokens=1 delims=}" %%b in ("!temp!") do (
-                set "BASE_DOCUMENTS_API_TAG=%%b"
-            )
-        )
-    )
-
-    if "!BASE_DOCUMENTS_API_TAG!"=="" (
-        echo WARNING: Could not extract Documents API tag from docker-compose.yml
-        echo Using default: v8.0.0-alpha
-        set "BASE_DOCUMENTS_API_TAG=v8.0.0-alpha"
-    ) else (
-        echo Found base Documents API tag: !BASE_DOCUMENTS_API_TAG!
-    )
-)
-
-REM Set the final DOCUMENTS_API_TAG based on architecture
+REM --- Set Documents API tag based on architecture ---
 if "!ARCH!"=="arm64" (
-    set "DOCUMENTS_API_TAG=!BASE_DOCUMENTS_API_TAG!-arm64"
+    set "DOCUMENTS_API_TAG=!IMAGE_TAG!-arm64"
 ) else (
-    set "DOCUMENTS_API_TAG=!BASE_DOCUMENTS_API_TAG!"
+    set "DOCUMENTS_API_TAG=!IMAGE_TAG!"
 )
-
-echo Documents API tag will be: !DOCUMENTS_API_TAG!
-echo.
 
 REM --- Analytics & Data Analysis selections ---
 set /p "includeAnalytics=Do you want to include analytics in the installation? [y/n] "
@@ -256,8 +234,6 @@ echo - Analytics: !analytics!
 echo - Data Analysis: !dataanalysis!
 echo ============================================
 echo.
-echo NOTE: Image versions are configured in docker-compose.yml
-echo.
 set /p "confirmInstall=Begin installation with these settings? [y/n] "
 if /i "!confirmInstall!" neq "y" (
     echo Installation cancelled.
@@ -265,13 +241,21 @@ if /i "!confirmInstall!" neq "y" (
     exit /b 0
 )
 
+REM --- Set image names based on edition ---
+if "!EDITION!"=="ee" (
+    set "IMAGE_SUFFIX=-ee"
+) else (
+    set "IMAGE_SUFFIX="
+)
+
 REM --- Create .env file ---
 echo Creating .env file...
 (
 echo # FormsFlow.ai Configuration
 echo # Generated on %date% %time%
-echo # Architecture: !ARCH!
 echo # Edition: !EDITION!
+echo # Version: !IMAGE_TAG!
+echo # Architecture: !ARCH!
 echo.
 echo # Architecture and Platform
 echo ARCHITECTURE=!ARCH!
@@ -279,6 +263,14 @@ echo PLATFORM=!PLATFORM!
 echo.
 echo # Edition
 echo EDITION=!EDITION!
+echo.
+echo # Image Names ^(EE editions use -ee suffix^)
+echo IMAGE_SUFFIX=!IMAGE_SUFFIX!
+echo.
+echo # Image Tags
+echo IMAGE_TAG=!IMAGE_TAG!
+echo FORMS_TAG=!FORMS_VERSION!
+echo DOCUMENTS_API_TAG=!DOCUMENTS_API_TAG!
 echo.
 echo # Database Configuration
 echo KEYCLOAK_JDBC_DB=keycloak
@@ -450,6 +442,8 @@ echo   - Username: admin
 echo   - Password: changeme
 echo.
 echo Edition installed: !EDITION! ^(!ARCH!^)
+echo Version: !IMAGE_TAG!
+echo Forms Version: !FORMS_VERSION!
 echo.
 pause
 endlocal

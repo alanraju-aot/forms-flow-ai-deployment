@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# ============================================
+# VERSION CONFIGURATION
+# ============================================
+# Modify these tags for testing alpha/beta versions
+CE_VERSION="v7.3.0"
+EE_VERSION="v8.0.0-alpha"  # Change to v8.0.0 for stable release
+FORMS_VERSION="v7.3.0"     # Same for both CE and EE
+
 echo "*******************************************"
 echo "*     formsflow.ai Installation Script    *"
 echo "*******************************************"
@@ -59,18 +67,58 @@ echo ""
 echo "Finding your IP address..."
 ip_add=""
 
-# Try different methods to get IP
-if command -v ip &>/dev/null; then
-    ip_add=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
-elif command -v ifconfig &>/dev/null; then
-    ip_add=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
-elif command -v hostname &>/dev/null; then
-    ip_add=$(hostname -I 2>/dev/null | awk '{print $1}')
+# Detect if running in Git Bash on Windows
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || uname -s | grep -qi "MINGW\|MSYS\|CYGWIN"; then
+    echo "Detected Git Bash/Windows environment..."
+    # Use Windows ipconfig command
+    ip_add=$(ipconfig.exe 2>/dev/null | grep -A 10 "Wireless LAN adapter Wi-Fi\|Ethernet adapter Ethernet" | grep "IPv4 Address" | head -n1 | awk -F': ' '{print $2}' | tr -d '\r\n ')
+    
+    # If that didn't work, try a simpler grep
+    if [ -z "$ip_add" ]; then
+        ip_add=$(ipconfig.exe 2>/dev/null | grep "IPv4 Address" | head -n1 | awk -F': ' '{print $2}' | tr -d '\r\n ' | sed 's/[^0-9.]//g')
+    fi
+    
+    # Filter out localhost
+    if [[ "$ip_add" == "127.0.0.1" ]]; then
+        ip_add=$(ipconfig.exe 2>/dev/null | grep "IPv4 Address" | grep -v "127.0.0.1" | head -n1 | awk -F': ' '{print $2}' | tr -d '\r\n ' | sed 's/[^0-9.]//g')
+    fi
+else
+    # Try different methods to get IP on Linux/Mac
+    if command -v ip &>/dev/null; then
+        ip_add=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+    elif command -v ifconfig &>/dev/null; then
+        ip_add=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
+    elif command -v hostname &>/dev/null; then
+        ip_add=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
 fi
 
 if [ -z "$ip_add" ]; then
     echo "WARNING: Could not automatically detect your IP address."
-    read -p "Please enter your IP address manually: " ip_add
+    echo "Trying alternative detection methods..."
+    
+    # Try using hostname command (works in Git Bash)
+    if command -v hostname &>/dev/null; then
+        temp_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        if [ -n "$temp_ip" ] && [[ "$temp_ip" != "127.0.0.1" ]]; then
+            ip_add="$temp_ip"
+        fi
+    fi
+    
+    # If still empty, try using Docker's host.docker.internal resolution
+    if [ -z "$ip_add" ] && command -v getent &>/dev/null; then
+        temp_ip=$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1}')
+        if [ -n "$temp_ip" ] && [[ "$temp_ip" != "127.0.0.1" ]]; then
+            ip_add="$temp_ip"
+        fi
+    fi
+    
+    # Last resort: suggest localhost for testing
+    if [ -z "$ip_add" ]; then
+        echo "SUGGESTION: For local testing, you can use 'localhost' or '127.0.0.1'"
+        echo "            For network access, please find your IP manually with: ipconfig (Windows) or ifconfig (Linux/Mac)"
+        read -p "Please enter your IP address manually: " ip_add
+    fi
 else
     echo "Detected IP address: $ip_add"
     read -p "Is this correct? [y/n] " confirmIP
@@ -114,22 +162,26 @@ echo ""
 
 # --- Select edition ---
 echo "Select installation type:"
-echo "  1. Open Source (Community Edition)"
-echo "  2. Premium (Enterprise Edition)"
+echo "  1. Open Source (Community Edition) "
+echo "  2. Premium (Enterprise Edition) "
 read -p "Enter your choice [1-2]: " editionChoice
 
 if [ "$editionChoice" == "2" ]; then
     EDITION="ee"
+    IMAGE_TAG="$EE_VERSION"
     echo ""
     echo "============================================"
     echo "Selected: Premium (Enterprise Edition)"
+    echo "Version: $EE_VERSION"
     echo "============================================"
     echo ""
 else
     EDITION="ce"
+    IMAGE_TAG="$CE_VERSION"
     echo ""
     echo "============================================"
     echo "Selected: Open Source (Community Edition)"
+    echo "Version: $CE_VERSION"
     echo "============================================"
     echo ""
 fi
@@ -159,33 +211,12 @@ if [ -z "$COMPOSE_FILE" ]; then
     exit 1
 fi
 
-# --- Extract Documents API tag from docker-compose.yml ---
-echo "Reading Documents API version from docker-compose.yml..."
-BASE_DOCUMENTS_API_TAG=""
-
-if [ -f "$COMPOSE_FILE" ]; then
-    # Extract the tag from the forms-flow-documents-api image line
-    # Looking for pattern like: image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
-    BASE_DOCUMENTS_API_TAG=$(grep -A 1 "forms-flow-documents-api:" "$COMPOSE_FILE" | grep "image:" | sed -n 's/.*DOCUMENTS_API_TAG:-\([^}]*\)}.*/\1/p')
-    
-    if [ -z "$BASE_DOCUMENTS_API_TAG" ]; then
-        echo "WARNING: Could not extract Documents API tag from docker-compose.yml"
-        echo "Using default: v8.0.0-alpha"
-        BASE_DOCUMENTS_API_TAG="v8.0.0-alpha"
-    else
-        echo "Found base Documents API tag: $BASE_DOCUMENTS_API_TAG"
-    fi
-fi
-
-# Set the final DOCUMENTS_API_TAG based on architecture
+# --- Set Documents API tag based on architecture ---
 if [ "$ARCH" == "arm64" ]; then
-    DOCUMENTS_API_TAG="${BASE_DOCUMENTS_API_TAG}-arm64"
+    DOCUMENTS_API_TAG="${IMAGE_TAG}-arm64"
 else
-    DOCUMENTS_API_TAG="$BASE_DOCUMENTS_API_TAG"
+    DOCUMENTS_API_TAG="$IMAGE_TAG"
 fi
-
-echo "Documents API tag will be: $DOCUMENTS_API_TAG"
-echo ""
 
 # --- Analytics & Data Analysis selections ---
 # Check if ARM64 and warn about analytics compatibility
@@ -247,12 +278,9 @@ echo "- IP Address: $ip_add"
 echo "- Edition: $EDITION"
 echo "- Architecture: $ARCH"
 echo "- PLATFORM: $PLATFORM"
-echo "- Documents API Tag: $DOCUMENTS_API_TAG"
 echo "- Analytics: $analytics"
 echo "- Data Analysis: $dataanalysis"
 echo "============================================"
-echo ""
-echo "NOTE: Image versions are configured in docker-compose.yml"
 echo ""
 read -p "Begin installation with these settings? [y/n] " confirmInstall
 if [[ ! "$confirmInstall" =~ ^[Yy]$ ]]; then
@@ -260,13 +288,21 @@ if [[ ! "$confirmInstall" =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# --- Set image names based on edition ---
+if [ "$EDITION" == "ee" ]; then
+    IMAGE_SUFFIX="-ee"
+else
+    IMAGE_SUFFIX=""
+fi
+
 # --- Create .env file ---
 echo "Creating .env file..."
 cat > "$DOCKER_COMPOSE_DIR/.env" << EOF
 # FormsFlow.ai Configuration
 # Generated on $(date)
-# Architecture: $ARCH
 # Edition: $EDITION
+# Version: $IMAGE_TAG
+# Architecture: $ARCH
 
 # Architecture and Platform
 ARCHITECTURE=$ARCH
@@ -275,7 +311,12 @@ PLATFORM=$PLATFORM
 # Edition
 EDITION=$EDITION
 
+# Image Names (EE editions use -ee suffix)
+IMAGE_SUFFIX=$IMAGE_SUFFIX
+
 # Image Tags
+IMAGE_TAG=$IMAGE_TAG
+FORMS_TAG=$FORMS_VERSION
 DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
 
 # Database Configuration
@@ -542,7 +583,7 @@ if [ "$dataanalysis" == "1" ]; then
     echo "Starting all services including Data Analysis API..."
     $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d
 else
-    echo "Starting core services (excluding Data Analysis API)..."
+    echo "Starting core services..."
     $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web redis
 fi
 
@@ -573,7 +614,7 @@ echo "  - Username: admin"
 echo "  - Password: changeme"
 echo ""
 echo "Edition installed: $EDITION ($ARCH)"
-echo "Documents API: $DOCUMENTS_API_TAG"
+echo "Version: $IMAGE_TAG"
 echo ""
 
 if [ "$ARCH" == "arm64" ] && [ "$analytics" == "0" ]; then
