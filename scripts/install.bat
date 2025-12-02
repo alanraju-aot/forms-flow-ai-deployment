@@ -4,10 +4,13 @@ setlocal EnableDelayedExpansion
 REM ============================================
 REM VERSION CONFIGURATION
 REM ============================================
-REM Modify these tags for testing alpha/beta versions
 set "CE_VERSION=v8.0.0-alpha"
 set "EE_VERSION=v8.0.0-alpha"
 set "FORMS_VERSION=v7.3.0"
+
+REM Docker registry configuration
+set "DOCKER_REGISTRY=docker.io"
+set "DOCKER_REGISTRY_USER="
 
 echo *******************************************
 echo *     formsflow.ai Installation Script    *
@@ -149,6 +152,91 @@ if "!editionChoice!"=="2" (
     echo Version: !EE_VERSION!
     echo ============================================
     echo.
+    
+    REM --- Docker Login for Enterprise Edition ---
+    echo Enterprise Edition requires Docker registry authentication.
+    echo.
+    
+    REM Fixed Docker username for formsflow.ai Enterprise Edition
+    set "DOCKER_USERNAME=formsflowaidev"
+    
+    REM Check if already logged in
+    set "CURRENT_USER="
+    for /f "tokens=2" %%u in ('docker info 2^>nul ^| findstr "Username:"') do set "CURRENT_USER=%%u"
+    
+    if defined CURRENT_USER (
+        echo Already logged in as: !CURRENT_USER!
+        
+        if "!CURRENT_USER!"=="!DOCKER_USERNAME!" (
+            set /p "useCurrentLogin=Do you want to use the existing login? [y/n] "
+            
+            if /i "!useCurrentLogin!"=="y" (
+                set "NEED_LOGIN=false"
+                echo Using existing Docker login.
+            ) else (
+                echo Logging out from current session...
+                docker logout 2>nul
+                set "NEED_LOGIN=true"
+            )
+        ) else (
+            echo Note: Enterprise Edition requires logging in as '!DOCKER_USERNAME!'
+            set /p "switchAccount=Do you want to switch accounts? [y/n] "
+            
+            if /i "!switchAccount!"=="y" (
+                echo Logging out from current session...
+                docker logout 2>nul
+                set "NEED_LOGIN=true"
+            ) else (
+                echo WARNING: Current user may not have access to Enterprise Edition images.
+                echo Continuing with current login, but installation may fail.
+                set "NEED_LOGIN=false"
+            )
+        )
+    ) else (
+        set "NEED_LOGIN=true"
+    )
+    
+    if "!NEED_LOGIN!"=="true" (
+        echo.
+        echo ============================================
+        echo Docker Registry Login Required
+        echo ============================================
+        echo Username: !DOCKER_USERNAME!
+        echo.
+        echo Please enter your access token ^(password^):
+        echo Note: Your input will be hidden for security
+        echo.
+        
+        REM Use PowerShell for secure password input
+        for /f "usebackq delims=" %%p in (`powershell -Command "$p = Read-Host 'Access Token' -AsSecureString; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($p))"`) do set "DOCKER_TOKEN=%%p"
+        
+        echo.
+        echo Logging in to Docker registry as !DOCKER_USERNAME!...
+        echo !DOCKER_TOKEN!| docker login -u "!DOCKER_USERNAME!" --password-stdin 2>nul | findstr /C:"Login Succeeded" >nul
+        
+        if !ERRORLEVEL! EQU 0 (
+            echo √ Successfully logged in to Docker registry!
+            echo.
+        ) else (
+            echo.
+            echo ============================================
+            echo ERROR: Docker login failed!
+            echo ============================================
+            echo.
+            echo Possible reasons:
+            echo   1. Invalid access token
+            echo   2. Token has expired
+            echo   3. Account doesn't have Enterprise Edition access
+            echo.
+            echo Please verify your token and try again.
+            echo If you don't have access, contact your administrator
+            echo or use Community Edition ^(Option 1^).
+            echo.
+            pause
+            exit /b 1
+        )
+    )
+    
 ) else (
     set "EDITION=ce"
     set "IMAGE_TAG=!CE_VERSION!"
@@ -380,6 +468,7 @@ echo ***********************************************
 !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d keycloak keycloak-db keycloak-customizations
 if errorlevel 1 (
     echo ERROR: Failed to start Keycloak.
+    echo If this is an authentication error, please check your Docker login credentials.
     pause
     exit /b 1
 )
@@ -415,7 +504,17 @@ if "!dataanalysis!"=="1" (
     call !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web redis
 )
 if errorlevel 1 (
+    echo.
     echo ERROR: Failed to start main containers.
+    echo.
+    if "!EDITION!"=="ee" (
+        echo This might be an authentication issue. Please verify:
+        echo 1. You are logged in to Docker registry: docker login
+        echo 2. Your account has access to Enterprise Edition images
+        echo 3. You can manually pull an image: docker pull formsflow/forms-flow-webapi-ee:!IMAGE_TAG!
+        echo.
+        echo For access to Enterprise Edition, please contact your administrator.
+    )
     pause
     exit /b 1
 )
