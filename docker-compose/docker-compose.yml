@@ -32,7 +32,6 @@ services:
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-changeme}
       - KEYCLOAK_START_MODE=${KEYCLOAK_START_MODE:-start-dev}
       - KEYCLOAK_HTTP_PATH=${KEYCLOAK_HTTP_PATH:-/auth}
-
     ports:
       - "8080:8080"
     depends_on:
@@ -43,7 +42,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: formsflow/keycloak-customizations:v8.0.0-alpha
+    image: ${KEYCLOAK_CUSTOMIZATIONS_IMAGE:-formsflow/keycloak-customizations}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     restart: always
     tty: true
     stdin_open: true  
@@ -70,7 +69,7 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: formsflow/forms-flow-web:v8.0.0-alpha
+    image: ${FORMS_FLOW_WEB_IMAGE:-formsflow/forms-flow-web}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
@@ -120,14 +119,13 @@ services:
       - REACT_APP_USER_NAME_DISPLAY_CLAIM=${USER_NAME_DISPLAY_CLAIM:-}
       - REACT_APP_ENABLE_COMPACT_FORM_VIEW=${ENABLE_COMPACT_FORM_VIEW:-false}
       - REACT_APP_GRAPHQL_API_URL=${GRAPHQL_API_URL}
-      
     ports:
       - "3000:8080"
     networks:
       - formsflow
 
   forms-flow-forms:
-    image: formsflow/forms-flow-forms:v7.3.0
+    image: ${FORMS_FLOW_FORMS_IMAGE:-formsflow/forms-flow-forms}:${FORMS_TAG:-v7.3.0}
     restart: always
     environment:
       DEBUG: formio:*
@@ -158,7 +156,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: formsflow/forms-flow-bpm:v8.0.0-alpha
+    image: ${FORMS_FLOW_BPM_IMAGE:-formsflow/forms-flow-bpm}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -236,7 +234,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: formsflow/forms-flow-webapi:v8.0.0-alpha
+    image: ${FORMS_FLOW_WEBAPI_IMAGE:-formsflow/forms-flow-webapi}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     restart: always
     links:
       - forms-flow-webapi-db
@@ -302,11 +300,13 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: formsflow/forms-flow-documents-api:v8.0.0-alpha
+    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}${IMAGE_SUFFIX}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
     restart: always
     links:
       - forms-flow-forms
       - redis
+    volumes:
+      - ./:/app:rw
     environment:
       FORMSFLOW_API_CORS_ORIGINS: ${FORMSFLOW_API_CORS_ORIGINS:-*}
       JWT_OIDC_WELL_KNOWN_CONFIG: ${KEYCLOAK_URL}${KEYCLOAK_URL_HTTP_RELATIVE_PATH:-/auth}/realms/${KEYCLOAK_URL_REALM:-forms-flow-ai}/.well-known/openid-configuration
@@ -353,7 +353,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: formsflow/forms-flow-data-analysis-api:v8.0.0-alpha
+    image: ${FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:-formsflow/forms-flow-data-analysis-api}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -377,8 +377,9 @@ services:
       - "6001:5000"
     networks:
       - formsflow
+
   forms-flow-data-layer:
-    image: formsflow/forms-flow-data-layer:v8.0.0-alpha
+    image: ${FORMS_FLOW_DATA_LAYER_IMAGE:-formsflow/forms-flow-data-layer}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
     container_name: forms-flow-data-layer
     restart: always
     ports:
@@ -398,8 +399,6 @@ services:
       JWT_OIDC_AUDIENCE: ${KEYCLOAK_WEB_CLIENT_ID:-forms-flow-web}
       JWT_OIDC_CACHING_ENABLED: True
       FORMSFLOW_DATALAYER_CORS_ORIGINS: ${FORMSFLOW_DATALAYER_CORS_ORIGINS:-*}
-
-      # WebAPI DB URL
       FORMSFLOW_API_DB_URL: ${FORMSFLOW_API_DB_URL}
       FORMSFLOW_API_DB_HOST: ${FORMSFLOW_API_DB_HOST:-localhost}
       FORMSFLOW_API_DB_PORT: ${FORMSFLOW_API_DB_PORT:-5432}
@@ -407,8 +406,6 @@ services:
       FORMSFLOW_API_DB_PASSWORD: ${FORMSFLOW_API_DB_PASSWORD}
       FORMSFLOW_API_DB_NAME: ${FORMSFLOW_API_DB_NAME:-webapi}
       FORMSFLOW_API_DB_OPTIONS: ${FORMSFLOW_API_DB_OPTIONS}
-
-      # Formio DB URL
       FORMIO_DB_USERNAME: ${FORMIO_DB_USERNAME}
       FORMIO_DB_PASSWORD: ${FORMIO_DB_PASSWORD}
       FORMIO_DB_URI: ${FORMIO_DB_URI:-mongodb://${FORMIO_DB_USERNAME}:${FORMIO_DB_PASSWORD}@${FORMIO_DB_HOST}:${FORMIO_DB_PORT}/${FORMIO_DB_NAME}?${FORMIO_DB_OPTIONS}}
@@ -416,8 +413,6 @@ services:
       FORMIO_DB_PORT: ${FORMIO_DB_PORT:-27017}
       FORMIO_DB_NAME: ${FORMIO_DB_NAME:-formio}
       FORMIO_DB_OPTIONS: ${FORMIO_DB_OPTIONS:-authMechanism=SCRAM-SHA-1&authSource=admin}
-
-      # Camunda DB URL
       CAMUNDA_DB_PASSWORD: ${CAMUNDA_DB_PASSWORD}
       CAMUNDA_DB_URL: ${CAMUNDA_DB_URL}
       CAMUNDA_DB_USER: ${CAMUNDA_DB_USER}
@@ -428,11 +423,11 @@ services:
     networks:
       - formsflow
 
-
 volumes:
   postgres:
   mongodb:
   keycloak_custom_data:
+
 networks:
   formsflow:
     driver: bridge
