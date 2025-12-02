@@ -2,6 +2,47 @@
 
 Mark  items as `Added`, `Changed`, `Fixed`, `Removed`, `Untested Features`, `Upcoming Features`, `Known Issues`
 
+## 8.0.0 - 2025-12-03 - Enterprise Edition
+
+`Added`
+
+* Added automatic system architecture detection (amd64 / arm64) in both shell and batch installation scripts.
+* Added a unified Docker Compose file by merging multiple compose files into a single consolidated configuration.
+* Added Enterprise Edition installation flow with authentication prompts for pulling private Docker images.
+* Added automated main host IP detection during the installation process.
+* Added enhanced script variables to dynamically manage image names and tags.
+* Added Docker login support for EE private repositories in installation scripts.
+* Added updated Sonar GitHub Action configuration for improved code quality checks.
+
+`Changed`
+
+* Updated image versions to Enterprise Edition release **v8.0.0**, and updated `forms-flow-forms` to **v7.3.0**.
+* Modified installation flow to support both Enterprise Edition and Open Source Edition with conditional branching.
+* Enhanced user messaging, validation, and error handling across both Windows and Linux installation scripts.
+* Improved uninstall script to ensure complete cleanup with no unexpected terminations.
+* Updated environment variable handling and unified docker-compose structure for improved maintainability.
+
+`Fixed`
+
+* Fixed incorrect image tag selection issues for ARM64 platform during installation.
+* Fixed discrepancies caused by multiple compose file references by centralizing to one unified compose setup.
+* Fixed container startup and dependency sequencing issues within the EE Docker Compose flow.
+
+`Removed`
+
+* Removed legacy individual docker-compose files after consolidation into a single unified file.
+* Removed deprecated installation logic and unused code paths from previous versions.
+
+`Known Issues`
+
+* Some optional external components may still lack multi-architecture (ARM64) image support, depending on upstream availability.
+
+`Upcoming Features`
+
+* Planned support for automated multi-tenant Enterprise Edition deployments using the updated installation pipeline.
+* Future enhancement to auto-fetch and sync image versions from a remote manifest to reduce manual version management.
+
+
 ## 7.3.0 - 2025-10-14
 
 `Added` 
