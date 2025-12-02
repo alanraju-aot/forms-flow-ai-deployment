@@ -5,8 +5,12 @@
 # ============================================
 # Modify these tags for testing alpha/beta versions
 CE_VERSION="v8.0.0-alpha"
-EE_VERSION="v8.0.0-alpha"  # Change to v8.0.0 for stable release
-FORMS_VERSION="v7.3.0"     # Same for both CE and EE
+EE_VERSION="v8.0.0-rc"
+FORMS_VERSION="v7.3.0"
+
+# Docker registry configuration
+DOCKER_REGISTRY="docker.io"  # Change if using a different registry
+DOCKER_REGISTRY_USER=""       # Will be prompted if needed
 
 echo "*******************************************"
 echo "*     formsflow.ai Installation Script    *"
@@ -175,6 +179,85 @@ if [ "$editionChoice" == "2" ]; then
     echo "Version: $EE_VERSION"
     echo "============================================"
     echo ""
+    
+    # --- Docker Login for Enterprise Edition ---
+    echo "Enterprise Edition requires Docker registry authentication."
+    echo ""
+    
+    # Fixed Docker username for formsflow.ai Enterprise Edition
+    DOCKER_USERNAME="formsflowaidev"
+    
+    # Check if already logged in as the correct user
+    if docker info 2>/dev/null | grep -q "Username:"; then
+        CURRENT_USER=$(docker info 2>/dev/null | grep "Username:" | awk '{print $2}')
+        echo "Already logged in as: $CURRENT_USER"
+        
+        if [ "$CURRENT_USER" == "$DOCKER_USERNAME" ]; then
+            read -p "Do you want to use the existing login? [y/n] " useCurrentLogin
+            
+            if [[ "$useCurrentLogin" =~ ^[Yy]$ ]]; then
+                NEED_LOGIN=false
+                echo "Using existing Docker login."
+            else
+                echo "Logging out from current session..."
+                docker logout 2>/dev/null
+                NEED_LOGIN=true
+            fi
+        else
+            echo "Note: Enterprise Edition requires logging in as '$DOCKER_USERNAME'"
+            read -p "Do you want to switch accounts? [y/n] " switchAccount
+            
+            if [[ "$switchAccount" =~ ^[Yy]$ ]]; then
+                echo "Logging out from current session..."
+                docker logout 2>/dev/null
+                NEED_LOGIN=true
+            else
+                echo "WARNING: Current user may not have access to Enterprise Edition images."
+                echo "Continuing with current login, but installation may fail."
+                NEED_LOGIN=false
+            fi
+        fi
+    else
+        NEED_LOGIN=true
+    fi
+    
+    if [ "$NEED_LOGIN" = true ]; then
+        echo ""
+        echo "============================================"
+        echo "Docker Registry Login Required"
+        echo "============================================"
+        echo "Username: $DOCKER_USERNAME"
+        echo ""
+        echo "Please enter your access token (password):"
+        echo "Note: Your input will be hidden for security"
+        echo ""
+        read -sp "Access Token: " DOCKER_TOKEN
+        echo ""
+        echo ""
+        
+        echo "Logging in to Docker registry as $DOCKER_USERNAME..."
+        if echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USERNAME" --password-stdin 2>&1 | grep -q "Login Succeeded"; then
+            echo "✓ Successfully logged in to Docker registry!"
+            echo ""
+        else
+            echo ""
+            echo "============================================"
+            echo "ERROR: Docker login failed!"
+            echo "============================================"
+            echo ""
+            echo "Possible reasons:"
+            echo "  1. Invalid access token"
+            echo "  2. Token has expired"
+            echo "  3. Account doesn't have Enterprise Edition access"
+            echo ""
+            echo "Please verify your token and try again."
+            echo "If you don't have access, contact your administrator"
+            echo "or use Community Edition (Option 1)."
+            echo ""
+            exit 1
+        fi
+    fi
+    
 else
     EDITION="ce"
     IMAGE_TAG="$CE_VERSION"
@@ -551,6 +634,7 @@ echo "***********************************************"
 $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to start Keycloak."
+    echo "If this is an authentication error, please check your Docker login credentials."
     exit 1
 fi
 echo "Waiting for Keycloak to initialize..."
@@ -588,7 +672,17 @@ else
 fi
 
 if [ $? -ne 0 ]; then
+    echo ""
     echo "ERROR: Failed to start main containers."
+    echo ""
+    if [ "$EDITION" == "ee" ]; then
+        echo "This might be an authentication issue. Please verify:"
+        echo "1. You are logged in to Docker registry: docker login"
+        echo "2. Your account has access to Enterprise Edition images"
+        echo "3. You can manually pull an image: docker pull formsflow/forms-flow-webapi-ee:$IMAGE_TAG"
+        echo ""
+        echo "For access to Enterprise Edition, please contact your administrator."
+    fi
     exit 1
 fi
 

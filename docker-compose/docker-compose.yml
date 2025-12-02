@@ -42,7 +42,7 @@ services:
 
   keycloak-customizations:
     container_name: keycloak-customizations
-    image: ${KEYCLOAK_CUSTOMIZATIONS_IMAGE:-formsflow/keycloak-customizations}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${KEYCLOAK_CUSTOMIZATIONS_IMAGE:-formsflow/keycloak-customizations}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     restart: always
     tty: true
     stdin_open: true  
@@ -69,18 +69,18 @@ services:
       - formsflow
 
   forms-flow-web:
-    image: ${FORMS_FLOW_WEB_IMAGE:-formsflow/forms-flow-web}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_WEB_IMAGE:-formsflow/forms-flow-web}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     links:
       - forms-flow-webapi
     entrypoint: /bin/sh -c "/usr/share/nginx/html/config/env.sh && nginx -g 'daemon off;'"
     environment:
-      # - MF_FORMSFLOW_WEB_URL=${MF_FORMSFLOW_WEB_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-web@v8.0.0-alpha/forms-flow-web.gz.js}
-      # - MF_FORMSFLOW_NAV_URL=${MF_FORMSFLOW_NAV_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v8.0.0-alpha/forms-flow-nav.gz.js}
-      # - MF_FORMSFLOW_SERVICE_URL=${MF_FORMSFLOW_SERVICE_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v8.0.0-alpha/forms-flow-service.gz.js}
-      # - MF_FORMSFLOW_COMPONENTS_URL=${MF_FORMSFLOW_COMPONENTS_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-components@v8.0.0-alpha/forms-flow-components.gz.js}
-      # - MF_FORMSFLOW_ADMIN_URL=${MF_FORMSFLOW_ADMIN_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v8.0.0-alpha/forms-flow-admin.gz.js}
-      # - MF_FORMSFLOW_REVIEW_URL=${MF_FORMSFLOW_REVIEW_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-review@v8.0.0-alpha/forms-flow-review.gz.js}
-      # - MF_FORMSFLOW_SUBMISSIONS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-submissions@v8.0.0-alpha/forms-flow-submissions.gz.js
+      # - MF_FORMSFLOW_WEB_URL=${MF_FORMSFLOW_WEB_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-web@v8.0.0/forms-flow-web.gz.js}
+      # - MF_FORMSFLOW_NAV_URL=${MF_FORMSFLOW_NAV_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v8.0.0/forms-flow-nav.gz.js}
+      # - MF_FORMSFLOW_SERVICE_URL=${MF_FORMSFLOW_SERVICE_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v8.0.0/forms-flow-service.gz.js}
+      # - MF_FORMSFLOW_COMPONENTS_URL=${MF_FORMSFLOW_COMPONENTS_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-components@v8.0.0/forms-flow-components.gz.js}
+      # - MF_FORMSFLOW_ADMIN_URL=${MF_FORMSFLOW_ADMIN_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v8.0.0/forms-flow-admin.gz.js}
+      # - MF_FORMSFLOW_REVIEW_URL=${MF_FORMSFLOW_REVIEW_URL:-https://forms-flow-microfrontends.aot-technologies.com/forms-flow-review@v8.0.0/forms-flow-review.gz.js}
+      # - MF_FORMSFLOW_SUBMISSIONS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-submissions@v8.0.0/forms-flow-submissions.gz.js
       # - NODE_ENV=${NODE_ENV:-production}
       - NODE_ENV=${NODE_ENV:-production}
       - REACT_APP_API_SERVER_URL=${FORMIO_DEFAULT_PROJECT_URL}
@@ -156,7 +156,7 @@ services:
       - formsflow
 
   forms-flow-bpm:
-    image: ${FORMS_FLOW_BPM_IMAGE:-formsflow/forms-flow-bpm}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_BPM_IMAGE:-formsflow/forms-flow-bpm}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     restart: always
     environment:
       - KEYCLOAK_URL=${KEYCLOAK_URL}
@@ -234,7 +234,7 @@ services:
       - formsflow
 
   forms-flow-webapi:
-    image: ${FORMS_FLOW_WEBAPI_IMAGE:-formsflow/forms-flow-webapi}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_WEBAPI_IMAGE:-formsflow/forms-flow-webapi}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     restart: always
     links:
       - forms-flow-webapi-db
@@ -300,7 +300,7 @@ services:
       - formsflow
 
   forms-flow-documents-api:
-    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}${IMAGE_SUFFIX}:${DOCUMENTS_API_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_DOCUMENTS_API_IMAGE:-formsflow/forms-flow-documents-api}${IMAGE_SUFFIX}:${DOCUMENTS_API_TAG:-v8.0.0}
     restart: always
     links:
       - forms-flow-forms
@@ -353,7 +353,7 @@ services:
       - '5430:5432'
 
   forms-flow-data-analysis-api:
-    image: ${FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:-formsflow/forms-flow-data-analysis-api}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_DATA_ANALYSIS_API_IMAGE:-formsflow/forms-flow-data-analysis-api}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     restart: always
     links:
       - forms-flow-data-analysis-db
@@ -379,7 +379,7 @@ services:
       - formsflow
 
   forms-flow-data-layer:
-    image: ${FORMS_FLOW_DATA_LAYER_IMAGE:-formsflow/forms-flow-data-layer}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0-alpha}
+    image: ${FORMS_FLOW_DATA_LAYER_IMAGE:-formsflow/forms-flow-data-layer}${IMAGE_SUFFIX}:${IMAGE_TAG:-v8.0.0}
     container_name: forms-flow-data-layer
     restart: always
     ports:
