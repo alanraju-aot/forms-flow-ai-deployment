@@ -2,7 +2,7 @@
 
 Mark  items as `Added`, `Changed`, `Fixed`, `Removed`, `Untested Features`, `Upcoming Features`, `Known Issues`
 
-## 8.0.0 - 2025-12-03 - Enterprise Edition
+## 8.0.0 - 2025-12-05 - Enterprise Edition
 
 `Added`
 
