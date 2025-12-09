@@ -146,6 +146,7 @@ REM Properly handle edition selection
 if "!editionChoice!"=="2" (
     set "EDITION=ee"
     set "IMAGE_TAG=!EE_VERSION!"
+    set "MF_EDITION=ee"
     echo.
     echo ============================================
     echo Selected: Premium ^(Enterprise Edition^)
@@ -240,6 +241,7 @@ if "!editionChoice!"=="2" (
 ) else (
     set "EDITION=ce"
     set "IMAGE_TAG=!CE_VERSION!"
+    set "MF_EDITION="
     echo.
     echo ============================================
     echo Selected: Open Source ^(Community Edition^)
@@ -336,6 +338,13 @@ if "!EDITION!"=="ee" (
     set "IMAGE_SUFFIX="
 )
 
+REM --- Set microfrontend URLs based on edition ---
+if "!EDITION!"=="ee" (
+    set "MF_WEB_PATH=forms-flow-web/web-ee"
+) else (
+    set "MF_WEB_PATH=forms-flow-web/web"
+)
+
 REM --- Create .env file ---
 echo Creating .env file...
 (
@@ -359,6 +368,15 @@ echo # Image Tags
 echo IMAGE_TAG=!IMAGE_TAG!
 echo FORMS_TAG=!FORMS_VERSION!
 echo DOCUMENTS_API_TAG=!DOCUMENTS_API_TAG!
+echo.
+echo # Microfrontend URLs ^(Commented out by default - uncomment in docker-compose if needed^)
+echo MF_FORMSFLOW_WEB_URL=https://forms-flow-microfrontends.aot-technologies.com/!MF_WEB_PATH!@v8.0.0/forms-flow-web.gz.js
+echo MF_FORMSFLOW_NAV_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v8.0.0/forms-flow-nav.gz.js
+echo MF_FORMSFLOW_SERVICE_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v8.0.0/forms-flow-service.gz.js
+echo MF_FORMSFLOW_COMPONENTS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-components@v8.0.0/forms-flow-components.gz.js
+echo MF_FORMSFLOW_ADMIN_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v8.0.0/forms-flow-admin.gz.js
+echo MF_FORMSFLOW_REVIEW_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-review@v8.0.0/forms-flow-review.gz.js
+echo MF_FORMSFLOW_SUBMISSIONS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-submissions@v8.0.0/forms-flow-submissions.gz.js
 echo.
 echo # Database Configuration
 echo KEYCLOAK_JDBC_DB=keycloak
