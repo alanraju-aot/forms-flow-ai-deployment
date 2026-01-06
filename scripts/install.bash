@@ -5,7 +5,7 @@
 # ============================================
 # Modify these tags for testing alpha/beta versions
 CE_VERSION="v8.0.0-alpha"
-EE_VERSION="v8.0.0-alpha"
+EE_VERSION="v8.0.0"
 FORMS_VERSION="v7.3.0"
 
 # Docker registry configuration
@@ -173,6 +173,7 @@ read -p "Enter your choice [1-2]: " editionChoice
 if [ "$editionChoice" == "2" ]; then
     EDITION="ee"
     IMAGE_TAG="$EE_VERSION"
+    MF_EDITION="ee"
     echo ""
     echo "============================================"
     echo "Selected: Premium (Enterprise Edition)"
@@ -261,6 +262,7 @@ if [ "$editionChoice" == "2" ]; then
 else
     EDITION="ce"
     IMAGE_TAG="$CE_VERSION"
+    MF_EDITION=""
     echo ""
     echo "============================================"
     echo "Selected: Open Source (Community Edition)"
@@ -378,6 +380,13 @@ else
     IMAGE_SUFFIX=""
 fi
 
+# --- Set microfrontend URLs based on edition ---
+if [ "$EDITION" == "ee" ]; then
+    MF_WEB_PATH="forms-flow-web/web-ee"
+else
+    MF_WEB_PATH="forms-flow-web/web"
+fi
+
 # --- Create .env file ---
 echo "Creating .env file..."
 cat > "$DOCKER_COMPOSE_DIR/.env" << EOF
@@ -401,6 +410,15 @@ IMAGE_SUFFIX=$IMAGE_SUFFIX
 IMAGE_TAG=$IMAGE_TAG
 FORMS_TAG=$FORMS_VERSION
 DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
+
+# Microfrontend URLs (Commented out by default - uncomment in docker-compose if needed)
+MF_FORMSFLOW_WEB_URL=https://forms-flow-microfrontends.aot-technologies.com/$MF_WEB_PATH@v8.0.0/forms-flow-web.gz.js
+MF_FORMSFLOW_NAV_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-nav@v8.0.0/forms-flow-nav.gz.js
+MF_FORMSFLOW_SERVICE_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-service@v8.0.0/forms-flow-service.gz.js
+MF_FORMSFLOW_COMPONENTS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-components@v8.0.0/forms-flow-components.gz.js
+MF_FORMSFLOW_ADMIN_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-admin@v8.0.0/forms-flow-admin.gz.js
+MF_FORMSFLOW_REVIEW_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-review@v8.0.0/forms-flow-review.gz.js
+MF_FORMSFLOW_SUBMISSIONS_URL=https://forms-flow-microfrontends.aot-technologies.com/forms-flow-submissions@v8.0.0/forms-flow-submissions.gz.js
 
 # Database Configuration
 KEYCLOAK_JDBC_DB=keycloak
