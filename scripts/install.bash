@@ -7,6 +7,7 @@
 CE_VERSION="v8.1.0-alpha"
 EE_VERSION="v8.2.0-rc"
 FORMS_VERSION="v7.3.0"
+MCP_VERSION="v8.2.0"
 
 # Docker registry configuration
 DOCKER_REGISTRY="docker.io"  # Change if using a different registry
@@ -410,6 +411,7 @@ IMAGE_SUFFIX=$IMAGE_SUFFIX
 IMAGE_TAG=$IMAGE_TAG
 FORMS_TAG=$FORMS_VERSION
 DOCUMENTS_API_TAG=$DOCUMENTS_API_TAG
+MCP_TAG=$MCP_VERSION
 
 # Microfrontend URLs (Commented out by default - uncomment in docker-compose if needed)
 MF_FORMSFLOW_WEB_URL=https://forms-flow-microfrontends.aot-technologies.com/$MF_WEB_PATH@v8.2.0-rc/forms-flow-web.gz.js
@@ -538,6 +540,19 @@ GUNICORN_WORKERS=5
 GUNICORN_THREADS=10
 GUNICORN_TIMEOUT=120
 FORMSFLOW_DATA_LAYER_WORKERS=4
+
+# MCP Configuration
+MCP_HOST_PORT=5050
+MCP_FORWARDED_ALLOW_IPS=*
+MCP_FORMSFLOW_API_URL=http://forms-flow-webapi:5000
+MCP_API_TIMEOUT=30
+MCP_OIDC_BASE_URL=http://localhost:5050/mcp-protocol
+MCP_OIDC_ISSUER_URL=http://localhost:5050/mcp-protocol
+MCP_OIDC_REDIRECT_PATH=/oauth/callback
+MCP_OIDC_SCOPES=openid
+MCP_OIDC_VERIFY_ID_TOKEN=true
+MCP_OIDC_REQUIRE_CONSENT=false
+MCP_FORMIO_URL=http://forms-flow-forms:3001
 EOF
 
 echo ".env file created successfully!"
@@ -709,7 +724,7 @@ if [ "$dataanalysis" == "1" ]; then
     $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d
 else
     echo "Starting core services..."
-    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web redis
+    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web forms-flow-mcp redis
 fi
 
 if [ $? -ne 0 ]; then

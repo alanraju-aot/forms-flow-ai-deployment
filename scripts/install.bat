@@ -7,6 +7,7 @@ REM ============================================
 set "CE_VERSION=v8.1.0-alpha"
 set "EE_VERSION=v8.2.0-rc"
 set "FORMS_VERSION=v7.3.0"
+set "MCP_VERSION=v8.2.0"
 
 REM Docker registry configuration
 set "DOCKER_REGISTRY=docker.io"
@@ -368,6 +369,7 @@ echo # Image Tags
 echo IMAGE_TAG=!IMAGE_TAG!
 echo FORMS_TAG=!FORMS_VERSION!
 echo DOCUMENTS_API_TAG=!DOCUMENTS_API_TAG!
+echo MCP_TAG=!MCP_VERSION!
 echo.
 echo # Microfrontend URLs ^(Commented out by default - uncomment in docker-compose if needed^)
 echo MF_FORMSFLOW_WEB_URL=https://forms-flow-microfrontends.aot-technologies.com/!MF_WEB_PATH!@v8.2.0-rc/forms-flow-web.gz.js
@@ -496,6 +498,19 @@ echo GUNICORN_WORKERS=5
 echo GUNICORN_THREADS=10
 echo GUNICORN_TIMEOUT=120
 echo FORMSFLOW_DATA_LAYER_WORKERS=4
+echo.
+echo # MCP Configuration
+echo MCP_HOST_PORT=5050
+echo MCP_FORWARDED_ALLOW_IPS=*
+echo MCP_FORMSFLOW_API_URL=http://forms-flow-webapi:5000
+echo MCP_API_TIMEOUT=30
+echo MCP_OIDC_BASE_URL=http://localhost:5050/mcp-protocol
+echo MCP_OIDC_ISSUER_URL=http://localhost:5050/mcp-protocol
+echo MCP_OIDC_REDIRECT_PATH=/oauth/callback
+echo MCP_OIDC_SCOPES=openid
+echo MCP_OIDC_VERIFY_ID_TOKEN=true
+echo MCP_OIDC_REQUIRE_CONSENT=false
+echo MCP_FORMIO_URL=http://forms-flow-forms:3001
 ) > "!DOCKER_COMPOSE_DIR!\.env"
 
 echo .env file created successfully!
@@ -542,7 +557,7 @@ if "!dataanalysis!"=="1" (
     call !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d
 ) else (
     echo Starting core services ^(excluding Data Analysis API^)...
-    call !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web redis
+    call !COMPOSE_COMMAND! -p formsflow-ai -f "!COMPOSE_FILE!" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web forms-flow-mcp redis
 )
 if errorlevel 1 (
     echo.
