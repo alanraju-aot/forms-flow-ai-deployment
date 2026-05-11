@@ -334,19 +334,7 @@ else
 fi
 echo ""
 
-echo "Sentiment Analysis enables assessment of sentiments within forms by"
-echo "considering specific topics specified during form creation."
-echo "The data analysis API provides interfaces for sentiment analysis."
-echo ""
-read -p "Do you want to include forms-flow-data-analysis-api? [y/n] " includeDataAnalysis
-if [[ "$includeDataAnalysis" =~ ^[Yy]$ ]]; then
-    dataanalysis=1
-    echo "Data Analysis API will be included."
-else
-    dataanalysis=0
-    echo "Data Analysis API will not be included."
-fi
-echo ""
+
 
 # If analytics requested but analytics compose file is missing, warn and skip analytics
 if [ "$analytics" == "1" ]; then
@@ -365,7 +353,6 @@ echo "- Edition: $EDITION"
 echo "- Architecture: $ARCH"
 echo "- PLATFORM: $PLATFORM"
 echo "- Analytics: $analytics"
-echo "- Data Analysis: $dataanalysis"
 echo "============================================"
 echo ""
 read -p "Begin installation with these settings? [y/n] " confirmInstall
@@ -435,10 +422,6 @@ CAMUNDA_JDBC_DB_NAME=formsflow-bpm
 FORMSFLOW_API_DB_USER=postgres
 FORMSFLOW_API_DB_PASSWORD=changeme
 FORMSFLOW_API_DB_NAME=webapi
-DATA_ANALYSIS_DB_USER=general
-DATA_ANALYSIS_DB_PASSWORD=changeme
-DATA_ANALYSIS_DB_NAME=dataanalysis
-
 # Keycloak Configuration
 KEYCLOAK_ADMIN_USER=admin
 KEYCLOAK_ADMIN_PASSWORD=changeme
@@ -466,9 +449,6 @@ FORMIO_DEFAULT_PROJECT_URL=http://$ip_add:3001
 FORMSFLOW_API_URL=http://$ip_add:5001
 BPM_API_URL=http://$ip_add:8000/camunda
 DOCUMENT_SERVICE_URL=http://$ip_add:5006
-DATA_ANALYSIS_URL=http://$ip_add:6001
-DATA_ANALYSIS_API_BASE_URL=http://$ip_add:6001
-
 # Application Configuration
 APPLICATION_NAME=formsflow.ai
 LANGUAGE=en
@@ -499,7 +479,7 @@ ENABLE_APPLICATIONS_ACCESS_PERMISSION_CHECK=false
 # AI Configuration
 AI_FORM_GENERATION_LIMIT_TRIAL=10
 AI_FORM_GENERATION_LIMIT_PAID=100
-AI_BUILDER_QUOTA_TIMEZONE=""
+AI_BUILDER_QUOTA_TIMEZONE=America/Toronto
 
 # Formio Configuration
 FORMIO_ROOT_EMAIL=admin@example.com
@@ -719,13 +699,8 @@ echo "***********************************************"
 echo "*       Starting Main FormsFlow Stack...       *"
 echo "***********************************************"
 
-if [ "$dataanalysis" == "1" ]; then
-    echo "Starting all services including Data Analysis API..."
-    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d
-else
-    echo "Starting core services..."
-    $COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web forms-flow-mcp redis
-fi
+echo "Starting core services..."
+$COMPOSE_COMMAND -p formsflow-ai -f "$COMPOSE_FILE" up -d keycloak keycloak-db keycloak-customizations forms-flow-forms-db forms-flow-webapi forms-flow-webapi-db forms-flow-bpm forms-flow-bpm-db forms-flow-forms forms-flow-documents-api forms-flow-data-layer forms-flow-web forms-flow-mcp redis
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -752,9 +727,6 @@ echo "  - FormsFlow Web: http://$ip_add:3000"
 echo "  - Keycloak:      http://$ip_add:8080/auth"
 echo "  - API:           http://$ip_add:5001"
 echo "  - BPM:           http://$ip_add:8000"
-if [ "$dataanalysis" == "1" ]; then
-    echo "  - Data Analysis: http://$ip_add:6001"
-fi
 if [ "$analytics" == "1" ]; then
     echo "  - Analytics:     http://$ip_add:7001"
 fi
